@@ -1,9 +1,17 @@
-# Môi trường ảo Python
-venv
+# Python virtual environment
+venv/
+.venv/
 
-# Cache Python
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 
-# File cấu hình nhạy cảm chứa mật khẩu
+# Environment variables
 .env
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
