@@ -1,11 +1,8 @@
-"""Schema = hình dạng dữ liệu đi vào (request) và đi ra (response) của API.
-
-FastAPI dùng schema để tự kiểm tra dữ liệu: sai kiểu / thiếu trường -> trả lỗi 422.
-"""
+"""Pydantic schemas for the sample items CRUD API."""
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ItemBase(BaseModel):
@@ -13,26 +10,47 @@ class ItemBase(BaseModel):
     description: str | None = Field(default=None, examples=["Mô tả ngắn"])
     price: Decimal = Field(default=0, ge=0, examples=[45000])
 
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Tên item không được để trống")
+        return value
+
 
 class ItemCreate(ItemBase):
-    """Dữ liệu FE gửi lên khi THÊM mới."""
+    """Data accepted when creating an item."""
 
 
 class ItemUpdate(BaseModel):
-    """Dữ liệu FE gửi lên khi SỬA. Trường nào không gửi thì giữ nguyên."""
-
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = None
     price: Decimal | None = Field(default=None, ge=0)
 
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError("Tên item không được để trống")
+        return value
+
+    @model_validator(mode="after")
+    def require_update_fields(self) -> "ItemUpdate":
+        if not self.model_fields_set:
+            raise ValueError("Cần ít nhất một trường để cập nhật")
+        if "name" in self.model_fields_set and self.name is None:
+            raise ValueError("Tên item không được để trống")
+        return self
+
 
 class ItemOut(ItemBase):
-    """Dữ liệu API trả về cho FE."""
-
-    # from_attributes: cho phép đọc thẳng từ object SQLAlchemy (item.name, item.price...)
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    price: float  # trả về dạng số (45000.0) cho FE dễ dùng
+    price: float
     created_at: datetime
     updated_at: datetime

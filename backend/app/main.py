@@ -11,7 +11,7 @@ from sqlalchemy.exc import OperationalError
 
 from app import models  # noqa: F401 - import để SQLAlchemy biết các bảng
 from app.core.config import settings
-from app.db.session import Base, engine
+from app.db.database import Base, engine
 from app.routers import health, items
 
 
@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     except OperationalError as error:
         print("[DB] KHÔNG kết nối được MySQL! Kiểm tra MySQL đã bật chưa và file .env.")
         if "Unknown database" in str(error.orig):
-            print("[DB] Chưa có database -> mở MySQL Workbench, chạy file sql/init.sql")
+            print("[DB] Chưa có database -> chạy file sql/task_project_management.sql")
         print(f"[DB] Chi tiết: {error.orig}")
     yield
 
