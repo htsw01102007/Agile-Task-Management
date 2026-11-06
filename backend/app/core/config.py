@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     DB_HOST: str = "127.0.0.1"
     DB_PORT: int = 3306
     DB_USER: str = "root"
-    DB_PASSWORD: str = ""
+    DB_PASSWORD: str = "123456"
     DB_NAME: str = "app_db"
 
     # Chuỗi các origin cách nhau bằng dấu phẩy, hoặc "*"
