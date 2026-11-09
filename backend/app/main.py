@@ -1,50 +1,78 @@
-"""Điểm khởi động của backend.
-
-Chạy:  uvicorn app.main:app --reload
-Tài liệu API tự sinh: http://127.0.0.1:8000/docs
-"""
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.exc import OperationalError
 
-from app import models  # noqa: F401 - import để SQLAlchemy biết các bảng
+from app import models  # noqa: F401
 from app.core.config import settings
-from app.db.database import Base, engine
-from app.routers import health, items
+from app.db.session import Base, engine
+from app.routers import (
+    health_router, auth_router,
+    project_router, project_members_router,
+    invitations_router, invitations_public_router,
+    label_router, task_router, my_tasks_router,
+    checklist_router, comment_router, attachment_router,
+    notification_router, activity_log_router, ws_router,
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Tự tạo các bảng còn thiếu khi server khởi động (bảng đã có thì bỏ qua).
-    # Lưu ý: create_all KHÔNG sửa bảng đã tồn tại. Đổi cột -> sửa bằng SQL hoặc xoá bảng tạo lại.
     try:
         Base.metadata.create_all(bind=engine)
         print(f"[DB] Đã kết nối MySQL {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
     except OperationalError as error:
         print("[DB] KHÔNG kết nối được MySQL! Kiểm tra MySQL đã bật chưa và file .env.")
-        if "Unknown database" in str(error.orig):
-            print("[DB] Chưa có database -> chạy file sql/task_project_management.sql")
         print(f"[DB] Chi tiết: {error.orig}")
     yield
 
 
-app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
+app = FastAPI(
+    title=settings.APP_NAME,
+    description="API quản lý công việc và dự án - Agile Task Management",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
-# CORS: cho phép trang FE (khác cổng/khác domain) gọi được API này
+# SessionMiddleware cho Google OAuth CSRF state
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
+
+# CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Mọi API đều bắt đầu bằng /api. Thêm router mới thì include ở đây.
-app.include_router(health.router, prefix="/api")
-app.include_router(items.router, prefix="/api")
+# Đăng ký các router với prefix /api
+app.include_router(health_router, prefix="/api")
+app.include_router(auth_router, prefix="/api")
+
+# Project Management routers
+app.include_router(project_router, prefix="/api")
+app.include_router(project_members_router, prefix="/api")
+app.include_router(invitations_router, prefix="/api")
+app.include_router(invitations_public_router, prefix="/api")
+app.include_router(label_router, prefix="/api")
+
+# Task & Sub-resource routers
+app.include_router(my_tasks_router, prefix="/api")
+app.include_router(task_router, prefix="/api")
+app.include_router(checklist_router, prefix="/api")
+app.include_router(comment_router, prefix="/api")
+app.include_router(attachment_router, prefix="/api")
+app.include_router(notification_router, prefix="/api")
+app.include_router(activity_log_router, prefix="/api")
+app.include_router(ws_router, prefix="/api")
 
 
 @app.get("/")
 def root():
-    return {"message": f"{settings.APP_NAME} đang chạy. Xem tài liệu API tại /docs"}
+    return {
+        "message": f"{settings.APP_NAME} đang chạy.",
+        "docs_url": "/docs",
+        "api_prefix": "/api"
+    }

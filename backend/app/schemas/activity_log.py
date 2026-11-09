@@ -1,38 +1,20 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-
-from pydantic import BaseModel, Field
-
-from app.models.activity_enums import ActivityAction, EntityType
-from app.schemas.common import ORMModel, UserBrief
+from typing import Optional
+from pydantic import BaseModel, ConfigDict
 
 
-class ActivityLogCreate(BaseModel):
-    project_id: int = Field(gt=0)
-    task_id: Optional[int] = Field(default=None, gt=0)
-    user_id: Optional[int] = Field(default=None, gt=0)
-    action: ActivityAction
-    entity_type: EntityType
-    entity_id: int = Field(gt=0)
-    old_value: Optional[Dict[str, Any]] = None
-    new_value: Optional[Dict[str, Any]] = None
+class ActivityLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-
-class ActivityLogResponse(ORMModel):
     id: int
     project_id: int
     task_id: Optional[int] = None
-    user: Optional[UserBrief] = None
+    user_id: int
+    entity_type: str
+    entity_id: Optional[int] = None
     action: str
-    entity_type: EntityType
-    entity_id: int
-    old_value: Optional[Dict[str, Any]] = None
-    new_value: Optional[Dict[str, Any]] = None
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
     created_at: datetime
-
-
-class ActivityLogListResponse(BaseModel):
-    items: List[ActivityLogResponse]
-    total: int
-    page: int
-    page_size: int
+    user_email: Optional[str] = None
+    user_full_name: Optional[str] = None

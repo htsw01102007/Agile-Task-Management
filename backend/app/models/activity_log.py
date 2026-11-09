@@ -1,49 +1,29 @@
-from sqlalchemy import JSON, Column, DateTime, Enum, ForeignKey, Index, String, event, func
+from sqlalchemy import Column, BigInteger, String, Text, DateTime, ForeignKey, func, Index
 from sqlalchemy.orm import relationship
-
-from app.db.database import Base
-from app.models.activity_enums import EntityType
-from app.models.common import ID
+from app.db.session import Base
 
 
 class ActivityLog(Base):
     __tablename__ = "activity_logs"
-    __table_args__ = (
-        Index("ix_activity_logs_project_created", "project_id", "created_at"),
-        Index("ix_activity_logs_task_created", "task_id", "created_at"),
-    )
 
-    id = Column(ID, primary_key=True, autoincrement=True)
-    project_id = Column(ID, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
-    task_id = Column(ID, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
-    user_id = Column(ID, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    action = Column(String(50), nullable=False)
-    entity_type = Column(
-        Enum(
-            EntityType,
-            name="activity_entity_type",
-            values_callable=lambda enum_cls: [member.value for member in enum_cls],
-        ),
-        nullable=False,
-    )
-    entity_id = Column(ID, nullable=False)
-    old_value = Column(JSON, nullable=True)
-    new_value = Column(JSON, nullable=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
+    project_id = Column(BigInteger, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    task_id = Column(BigInteger, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    entity_type = Column(String(50), nullable=False)  # "project", "task", "comment", "member", "invitation", "attachment"
+    entity_id = Column(BigInteger, nullable=True)
+    action = Column(String(50), nullable=False)  # "created", "updated", "deleted", "moved", "completed", "assigned", etc.
+    old_value = Column(Text, nullable=True)  # JSON string
+    new_value = Column(Text, nullable=True)  # JSON string
     created_at = Column(DateTime, nullable=False, server_default=func.now())
 
-    project = relationship("Project")
-    task = relationship("Task")
-    user = relationship("User")
+    __table_args__ = (
+        Index("idx_activity_project_created", "project_id", "created_at"),
+        Index("idx_activity_task_created", "task_id", "created_at"),
+        Index("idx_activity_user_created", "user_id", "created_at"),
+    )
 
-    def __repr__(self) -> str:
-        return f"<ActivityLog id={self.id} action={self.action} entity={self.entity_type}:{self.entity_id}>"
-
-
-@event.listens_for(ActivityLog, "before_update")
-def _block_update(mapper, connection, target):
-    raise RuntimeError("activity_logs is append-only and cannot be updated")
-
-
-@event.listens_for(ActivityLog, "before_delete")
-def _block_delete(mapper, connection, target):
-    raise RuntimeError("activity_logs is append-only and cannot be deleted")
+    # Relationships
+    project = relationship("Project", back_populates="activity_logs")
+    task = relationship("Task", back_populates="activity_logs")
+    user = relationship("User", back_populates="activity_logs")
