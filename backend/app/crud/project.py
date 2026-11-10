@@ -266,3 +266,4 @@ def find_invitation_by_token(db: Session, token_input: str) -> Optional[ProjectI
     if not invitation and len(token_input) == 64:
         invitation = db.query(ProjectInvitation).filter(ProjectInvitation.token == token_input).first()
     return invitation
+

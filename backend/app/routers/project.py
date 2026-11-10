@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from typing import List, Optional
@@ -44,12 +44,14 @@ def create_project(
 
 @router.get("", response_model=List[ProjectResponse])
 def list_my_projects(
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     status: Optional[str] = Query(None, pattern="^(active|completed|archived)$"),
 ):
+    """Danh sách dự án mà người dùng hiện tại là thành viên (chưa bị xoá mềm), có phân trang và lọc trạng thái"""
     query = (
         query_active_projects(db)
         .join(ProjectMember, ProjectMember.project_id == Project.id)
@@ -58,7 +60,9 @@ def list_my_projects(
     if status:
         query = query.filter(Project.status == status)
 
-    projects = query.order_by(Project.created_at.desc()).offset(skip).limit(limit).all()
+    total = query.count()
+    projects = query.order_by(Project.created_at.desc(), Project.id.desc()).offset(skip).limit(limit).all()
+    response.headers["X-Total-Count"] = str(total)
     return projects
 
 
@@ -96,9 +100,10 @@ def update_project(
     project, _ = data
 
     update_data = project_update.model_dump(exclude_unset=True)
-    if project.status in ("completed", "archived") and update_data.get("status") not in ("active", project.status, None):
-        pass
-    elif project.status in ("completed", "archived") and update_data.get("status") != "active":
+
+    # Dự án completed/archived là chỉ đọc: chỉ cho phép đổi trạng thái.
+    # Muốn sửa các trường khác phải mở lại 'active' (có thể gửi kèm trong cùng request).
+    if project.status in ("completed", "archived") and update_data.get("status") != "active":
         non_status_fields = {k for k in update_data.keys() if k != "status"}
         if non_status_fields:
             raise HTTPException(

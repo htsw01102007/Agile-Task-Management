@@ -12,3 +12,4 @@ class TaskLabel(Base):
     # Relationships
     task = relationship("Task", back_populates="labels")
     label = relationship("Label", back_populates="tasks")
+
