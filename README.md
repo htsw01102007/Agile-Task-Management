@@ -1,26 +1,35 @@
-# Frontend base: HTML · CSS · JavaScript thuần + axios
+# Agile Task Management
 
-Khung frontend chung cho các nhóm thực tập lớp **HN-KS25-CNTT1**. Không dùng framework, không cần cài đặt hay build gì. Đã có sẵn:
+Ứng dụng quản lý dự án Agile với frontend HTML/CSS/JavaScript thuần và backend FastAPI + MySQL. Frontend hiện có:
 
-- Layout chung (header + menu + footer) cho mọi trang
-- Module gọi API `js/api.js` dùng **axios**: cấu hình `baseURL` một lần, gom xử lý lỗi một chỗ bằng interceptor
-- Trang chủ kiểm tra kết nối **Frontend → Backend → MySQL**
-- Trang **Items**: ví dụ CRUD đầy đủ (thêm / sửa / xoá / tìm kiếm) gọi sang backend FastAPI
+- Dashboard chỉ hiển thị số liệu sau đăng nhập; tạo/sửa/lưu trữ dự án
+- Bảng Kanban từ API: CRUD task/list, kéo thả, hạn chót, độ ưu tiên, người thực hiện, checklist, bình luận và tệp đính kèm
+- Quản lý thành viên, vai trò và lời mời; đăng ký/đăng nhập; trang Việc của tôi
+- Quản trị người dùng (tổng quan số liệu toàn hệ thống, tài khoản mới, tạo/tìm kiếm/sửa/khóa tài khoản); tài khoản admin đầu tiên được khởi tạo từ `.env`
+- Hồ sơ cá nhân hiển thị email, tên đăng nhập và cho phép cập nhật họ tên
+- Layout chung, sidebar, thông báo toast và gọi API qua Axios
 
 ## 1. Cấu trúc thư mục
 
 ```
 frontend/
-├── index.html             # Trang chủ (kiểm tra kết nối)
+├── index.html             # Dashboard sau khi đăng nhập
 ├── pages/
-│   └── items.html         # Trang CRUD mẫu
+│   ├── project.html       # Bảng Kanban của dự án
+│   ├── login.html         # Đăng nhập
+│   ├── register.html      # Đăng ký
+│   ├── my-tasks.html      # Việc được giao
+│   ├── invitations.html   # Lời mời của tài khoản
+│   ├── invitation.html    # Chấp nhận/từ chối lời mời
+│   ├── profile.html       # Hồ sơ cá nhân
+│   └── admin-users.html   # Quản trị tài khoản
 ├── css/
 │   └── style.css          # Style chung, đổi màu ở :root
 ├── js/
 │   ├── config.js          # API_BASE_URL: địa chỉ backend
 │   ├── api.js             # axios instance + api.get / post / put / delete
 │   ├── utils.js           # escapeHtml, formatMoney, showToast...
-│   ├── layout.js          # Chèn header/menu/footer vào mọi trang
+│   ├── layout.js          # Header, sidebar và trạng thái đăng nhập
 │   └── pages/             # Mỗi trang 1 file JS riêng
 │       ├── home.js
 │       └── items.js
@@ -29,24 +38,24 @@ frontend/
 
 ## 2. Chạy frontend
 
-**Bước 1: chạy backend trước.** Làm theo `backend/README.md` cho đến khi mở http://127.0.0.1:8000/api/health thấy `"database":"connected"`.
+**Bước 1: cấu hình và chạy backend.** Làm theo `backend/README.md`. Đặt `ADMIN_EMAIL`, `ADMIN_USERNAME` và `ADMIN_PASSWORD` trong file `.env` ở thư mục gốc; mật khẩu admin cần ít nhất 8 ký tự, có chữ hoa, chữ thường và số. Admin được tạo tự động một lần khi backend khởi động, và mật khẩu không bị reset khi chạy lại.
 
-**Bước 2: mở frontend bằng Live Server.** Trong VS Code, cài extension *Live Server* (Ritwick Dey), chuột phải `frontend/index.html` → **Open with Live Server**. Trang mở ở `http://127.0.0.1:5500/index.html` và tự tải lại khi bạn lưu file.
+**Bước 2: mở frontend bằng Live Server.** Trong VS Code, mở `frontend/index.html` bằng Live Server. Mặc định API nằm tại `http://127.0.0.1:8001/api`; có thể đổi trong `frontend/js/config.js`.
 
-Trang chủ hiện **✅ Backend OK · MySQL: connected** là FE đã nối được BE. Bấm menu **Items (CRUD mẫu)** để thử thêm / sửa / xoá, rồi mở MySQL Workbench xem bảng `items` thay đổi theo.
+Đăng ký người dùng từ trang Đăng ký, hoặc đăng nhập admin bằng thông tin đã đặt trong `.env`. Dùng admin để quản lý tài khoản; tạo dự án và mời thành viên tại bảng dự án.
 
 > Nhấp đúp mở thẳng file `index.html` (địa chỉ `file:///...`) thường vẫn chạy, nhưng hay gặp lỗi khó hiểu. Nên dùng Live Server.
 
 ## 3. Frontend nối với backend thế nào?
 
 ```
-Trình duyệt (FE: 127.0.0.1:5500) --axios--> Backend FastAPI (127.0.0.1:8000/api) --> MySQL
+Trình duyệt (FE: 127.0.0.1:5500) --axios--> Backend FastAPI (127.0.0.1:8001/api) --> MySQL
 ```
 
 - **axios** được nạp từ CDN bằng thẻ `<script>` ở cuối mỗi trang HTML (cần có mạng). Không cần `npm install`.
 - Địa chỉ backend nằm ở **một chỗ duy nhất**: `js/config.js`
   ```js
-  API_BASE_URL: "http://127.0.0.1:8000/api",
+  API_BASE_URL: "http://127.0.0.1:8001/api",
   ```
   Backend đổi cổng, hoặc deploy lên server, thì chỉ sửa dòng này.
 - Mọi lời gọi API đều qua `js/api.js`. File này tạo sẵn 1 axios instance (`http`) có `baseURL`, và bọc thành các hàm trả về thẳng `response.data`:
@@ -62,7 +71,8 @@ Trình duyệt (FE: 127.0.0.1:5500) --axios--> Backend FastAPI (127.0.0.1:8000/a
     console.log(error.status);          // 404, 422, 500... hoặc 0 nếu không gọi được server
   }
   ```
-- Cần gửi token đăng nhập kèm mọi request? Trong `js/api.js` đã có sẵn đoạn interceptor mẫu (đang comment), chỉ cần bỏ comment.
+- Trang bảng gọi `GET /projects/{id}` và `GET /projects/{id}/board`; nếu chưa có token, hãy đăng nhập ở trang **Đăng nhập**.
+- `js/api.js` tự gửi `access_token` đã đăng nhập trong header `Authorization: Bearer ...`.
 - Backend phải cho phép FE gọi (**CORS**). Base code backend đã bật sẵn (`CORS_ORIGINS=*` trong `backend/.env`).
 
 ## 4. Thêm trang mới (vd: trang Sản phẩm)
@@ -85,7 +95,7 @@ Lưu ý khi tạo trang:
 
 | Hiện tượng | Cách sửa |
 |---|---|
-| "Không kết nối được backend..." | Backend chưa chạy, hoặc `API_BASE_URL` trong `js/config.js` sai cổng |
+| Không nhận được phản hồi từ backend | Trang Việc của tôi có nút **Kiểm tra backend** để thử `/api/health`; kiểm tra địa chỉ trong `js/config.js`, Uvicorn và CORS |
 | "Backend chạy nhưng MySQL lỗi" | Xem mục *Lỗi hay gặp* trong `backend/README.md` |
 | Console báo `axios is not defined` | Máy không có mạng nên không tải được axios từ CDN, hoặc thẻ `<script>` axios bị đặt sau `api.js` |
 | Console (F12) báo `blocked by CORS policy` | Kiểm tra `CORS_ORIGINS` trong `backend/.env`, sửa xong nhớ chạy lại backend |

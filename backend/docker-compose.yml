@@ -26,6 +26,10 @@ services:
       DB_USER: root
       DB_PASSWORD: ${DB_PASSWORD:-Minh01052007.}
       DB_NAME: ${DB_NAME:-task_project_management}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME:-Quản trị hệ thống}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       SECRET_KEY: ${SECRET_KEY:-super-secret-key}
     ports:
       - "8000:8000"
@@ -38,4 +42,3 @@ volumes:
 networks:
   app_network:
     driver: bridge
-

@@ -195,10 +195,12 @@ def validate_assignees_not_viewers(
     # Get project members who are not viewers
     valid_members = (
         db.query(ProjectMember.user_id)
+        .join(User, User.id == ProjectMember.user_id)
         .filter(
             ProjectMember.project_id == project_id,
             ProjectMember.user_id.in_(assignee_ids),
             ProjectMember.role != "viewer",
+            User.is_active.is_(True),
         )
         .all()
     )

@@ -176,6 +176,11 @@ def create_project_invitation(
     # 1. Kiểm tra nếu email đã là thành viên trong dự án
     existing_user = db.query(User).filter(User.email == normalized_email).first()
     if existing_user:
+        if not existing_user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Không thể mời tài khoản đang bị khoá",
+            )
         is_member = (
             db.query(ProjectMember)
             .filter(
@@ -266,4 +271,3 @@ def find_invitation_by_token(db: Session, token_input: str) -> Optional[ProjectI
     if not invitation and len(token_input) == 64:
         invitation = db.query(ProjectInvitation).filter(ProjectInvitation.token == token_input).first()
     return invitation
-

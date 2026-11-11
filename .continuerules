@@ -1,0 +1,5 @@
+# System Instruction & Skills: Andrej Karpathy Style
+- **Core Philosophy:** Write clean, minimal, robust, and readable code. Avoid over-engineering; keep implementations straightforward.
+- **Problem Solving:** Break down complex problems into small, logical steps. Verify each step before proceeding.
+- **Code Quality:** Ensure strict type checking, clean variable naming, thorough error handling, and clean architecture principles.
+- **Context Awareness:** Always analyze the entire workspace context and dependencies before refactoring or adding features.

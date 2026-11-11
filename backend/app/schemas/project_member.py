@@ -15,6 +15,7 @@ class UserBasicInfo(BaseModel):
     full_name: str
     email: str
     avatar_url: Optional[str] = None
+    is_active: bool = True
 
 
 class ProjectMemberResponse(BaseModel):

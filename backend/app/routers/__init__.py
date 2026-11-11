@@ -12,6 +12,7 @@ from app.routers.attachment import router as attachment_router
 from app.routers.notification import router as notification_router
 from app.routers.activity_log import router as activity_log_router
 from app.routers.ws import router as ws_router
+from app.routers.admin import router as admin_users_router
 
 __all__ = [
     "health_router",
@@ -29,4 +30,5 @@ __all__ = [
     "notification_router",
     "activity_log_router",
     "ws_router",
+    "admin_users_router",
 ]

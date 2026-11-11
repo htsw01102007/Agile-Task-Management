@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
-from sqlalchemy.orm import Session
-from sqlalchemy.sql import func
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.sql import func, case
 from typing import List, Optional
 from datetime import datetime, timezone
 
@@ -12,9 +12,13 @@ from app.models.user import User
 from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.models.list import ListModel
-from app.models.task import Task
+from app.models.task import Task, TaskAssignee
 from app.crud.project import create_project_with_owner, query_active_projects
-from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectDetailResponse
+from app.schemas.project import (
+    ProjectCreate, ProjectUpdate, ProjectResponse, ProjectDetailResponse,
+    ProjectBoardResponse, BoardTaskResponse, DashboardSummaryResponse,
+)
+from app.schemas.task import TaskAssigneeResponse
 from app.schemas.list import ListResponse, ListCreate, ListUpdate, ListReorder
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -66,6 +70,98 @@ def list_my_projects(
     return projects
 
 
+@router.get("/summary", response_model=List[ProjectDetailResponse])
+def list_project_summaries(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return dashboard project metrics with batched counts for the current member."""
+    projects = (
+        query_active_projects(db)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .filter(ProjectMember.user_id == current_user.id)
+        .order_by(Project.created_at.desc(), Project.id.desc())
+        .all()
+    )
+    if not projects:
+        return []
+
+    project_ids = [project.id for project in projects]
+    member_rows = (
+        db.query(ProjectMember.project_id, func.count(ProjectMember.user_id))
+        .filter(ProjectMember.project_id.in_(project_ids))
+        .group_by(ProjectMember.project_id)
+        .all()
+    )
+    member_counts = {project_id: count for project_id, count in member_rows}
+    user_roles = {
+        project_id: role
+        for project_id, role in db.query(ProjectMember.project_id, ProjectMember.role)
+        .filter(ProjectMember.project_id.in_(project_ids), ProjectMember.user_id == current_user.id)
+        .all()
+    }
+
+    task_rows = (
+        db.query(
+            Task.project_id,
+            func.count(Task.id),
+            func.sum(case((ListModel.is_done_column.is_(True), 1), else_=0)),
+        )
+        .join(ListModel, ListModel.id == Task.list_id)
+        .filter(Task.project_id.in_(project_ids), Task.is_deleted.is_(False))
+        .group_by(Task.project_id)
+        .all()
+    )
+    task_counts = {project_id: (total, completed or 0) for project_id, total, completed in task_rows}
+
+    summaries = []
+    for project in projects:
+        total, completed = task_counts.get(project.id, (0, 0))
+        summary = ProjectDetailResponse.model_validate(project)
+        summary.member_count = member_counts.get(project.id, 0)
+        summary.task_count = total
+        summary.completed_task_count = completed
+        summary.completion_rate = round(completed / total * 100, 2) if total else 0
+        summary.user_role = user_roles.get(project.id)
+        summaries.append(summary)
+    return summaries
+
+
+@router.get("/dashboard/summary", response_model=DashboardSummaryResponse)
+def get_dashboard_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    active_project_count = (
+        query_active_projects(db)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .filter(ProjectMember.user_id == current_user.id, Project.status == "active")
+        .count()
+    )
+    task_counts = (
+        db.query(
+            func.count(Task.id),
+            func.sum(case((ListModel.is_done_column.is_(False), 1), else_=0)),
+            func.sum(case((ListModel.is_done_column.is_(True), 1), else_=0)),
+        )
+        .join(Project, Project.id == Task.project_id)
+        .join(TaskAssignee, TaskAssignee.task_id == Task.id)
+        .join(ListModel, ListModel.id == Task.list_id)
+        .filter(
+            TaskAssignee.user_id == current_user.id,
+            Task.is_deleted.is_(False),
+            Project.deleted_at.is_(None),
+        )
+        .one()
+    )
+    return DashboardSummaryResponse(
+        active_project_count=active_project_count,
+        assigned_task_count=task_counts[0] or 0,
+        pending_task_count=task_counts[1] or 0,
+        completed_task_count=task_counts[2] or 0,
+    )
+
+
 @router.get("/{project_id}", response_model=ProjectDetailResponse)
 def get_project_detail(
     project_id: int,
@@ -77,15 +173,72 @@ def get_project_detail(
     response.member_count = db.query(ProjectMember).filter(ProjectMember.project_id == project_id).count()
     response.user_role = member.role
 
-    active_tasks_query = db.query(Task).filter(Task.project_id == project_id, Task.is_deleted.is_(False))
+    active_tasks_query = (
+        db.query(Task)
+        .join(ListModel, ListModel.id == Task.list_id)
+        .filter(Task.project_id == project_id, Task.is_deleted.is_(False))
+    )
     task_count = active_tasks_query.count()
-    completed_task_count = active_tasks_query.filter(Task.completed_at.isnot(None)).count()
+    completed_task_count = active_tasks_query.filter(ListModel.is_done_column.is_(True)).count()
     completion_rate = round((completed_task_count / task_count) * 100, 2) if task_count > 0 else 0.0
 
     response.task_count = task_count
     response.completed_task_count = completed_task_count
     response.completion_rate = completion_rate
     return response
+
+
+@router.get("/{project_id}/board", response_model=ProjectBoardResponse)
+def get_project_board(
+    project_id: int,
+    db: Session = Depends(get_db),
+    data: tuple[Project, ProjectMember] = Depends(get_project_and_membership),
+):
+    """Trả về toàn bộ cột, task và avatar người thực hiện của một bảng Kanban.
+
+    ``selectinload`` gộp dữ liệu assignee/user theo lô, tránh truy vấn N+1 khi
+    một bảng có nhiều task.
+    """
+    lists = (
+        db.query(ListModel)
+        .filter(ListModel.project_id == project_id)
+        .order_by(ListModel.position.asc(), ListModel.id.asc())
+        .all()
+    )
+    tasks = (
+        db.query(Task)
+        .options(selectinload(Task.assignees).joinedload(TaskAssignee.user))
+        .filter(Task.project_id == project_id, Task.is_deleted.is_(False))
+        .order_by(Task.list_id.asc(), Task.position.asc(), Task.id.asc())
+        .all()
+    )
+
+    return ProjectBoardResponse(
+        lists=lists,
+        tasks=[
+            BoardTaskResponse(
+                id=task.id,
+                list_id=task.list_id,
+                title=task.title,
+                priority=task.priority,
+                position=task.position,
+                created_by=task.created_by,
+                due_date=task.due_date,
+                completed_at=task.completed_at,
+                assignees=[
+                    TaskAssigneeResponse(
+                        user_id=assignment.user_id,
+                        assigned_at=assignment.assigned_at,
+                        user_email=assignment.user.email if assignment.user else None,
+                        user_full_name=assignment.user.full_name if assignment.user else None,
+                        user_avatar_url=assignment.user.avatar_url if assignment.user else None,
+                    )
+                    for assignment in task.assignees
+                ],
+            )
+            for task in tasks
+        ],
+    )
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
@@ -182,6 +335,16 @@ def create_list(
 
     if is_done:
         # Đảm bảo mỗi dự án chỉ có đúng 1 cột hoàn thành
+        previous_done_ids = [
+            item.id
+            for item in db.query(ListModel.id)
+            .filter(ListModel.project_id == project_id, ListModel.is_done_column.is_(True))
+            .all()
+        ]
+        if previous_done_ids:
+            db.query(Task).filter(Task.list_id.in_(previous_done_ids), Task.is_deleted.is_(False)).update(
+                {Task.completed_at: None}, synchronize_session=False
+            )
         db.query(ListModel).filter(
             ListModel.project_id == project_id,
             ListModel.is_done_column.is_(True),
@@ -288,7 +451,21 @@ def update_list(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Mỗi dự án phải có đúng một cột hoàn thành. Hãy đặt cột khác làm cột hoàn thành trước.",
                 )
+            db.query(Task).filter(
+                Task.list_id == list_id,
+                Task.is_deleted.is_(False),
+            ).update({Task.completed_at: None}, synchronize_session=False)
         elif new_is_done is True and not lst.is_done_column:
+            previous_done_lists = (
+                db.query(ListModel.id)
+                .filter(ListModel.project_id == project_id, ListModel.is_done_column.is_(True))
+                .all()
+            )
+            previous_done_ids = [item.id for item in previous_done_lists]
+            if previous_done_ids:
+                db.query(Task).filter(Task.list_id.in_(previous_done_ids), Task.is_deleted.is_(False)).update(
+                    {Task.completed_at: None}, synchronize_session=False
+                )
             db.query(ListModel).filter(
                 ListModel.project_id == project_id,
                 ListModel.id != list_id,

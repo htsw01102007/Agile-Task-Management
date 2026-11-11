@@ -105,7 +105,11 @@ def accept_invitation(
     )
 
     db.commit()
-    return {"message": "Đã chấp nhận lời mời tham gia dự án"}
+    return {
+        "message": "Đã chấp nhận lời mời tham gia dự án",
+        "project_id": project.id,
+        "project_name": project.name,
+    }
 
 
 @router.post("/decline/{token}")

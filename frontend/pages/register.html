@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Đăng ký | Agile Workspace</title>
+  <link rel="icon" href="../assets/images/logo.svg"><link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../">
+  <div id="app"><header id="app-header" class="hdr"></header><aside id="app-sidebar" class="side"></aside>
+    <main class="page-content auth-page">
+      <div class="crumb"><a href="../index.html">Không gian làm việc</a><span>›</span><span>Đăng ký</span></div>
+      <section class="auth-card" aria-labelledby="register-title">
+        <span class="mark auth-mark">A</span><h1 id="register-title">Tạo tài khoản</h1>
+        <p class="muted">Tạo tài khoản để tham gia và quản lý dự án.</p>
+        <form id="register-form">
+          <label for="full-name">Họ và tên</label><input id="full-name" name="full_name" maxlength="150" autocomplete="name" required>
+          <label for="register-email">Email</label><input id="register-email" name="email" type="email" autocomplete="email" required>
+          <label for="username">Tên đăng nhập</label><input id="username" name="username" minlength="3" maxlength="50" pattern="[A-Za-z0-9_]+" autocomplete="username" required>
+          <label for="register-password">Mật khẩu</label><input id="register-password" name="password" type="password" minlength="8" autocomplete="new-password" required>
+          <small>Mật khẩu cần có ít nhất 8 ký tự, chữ hoa, chữ thường và số.</small>
+          <button id="register-submit" class="btn btn-primary" type="submit">Tạo tài khoản</button>
+        </form>
+        <p class="auth-switch">Đã có tài khoản? <a href="login.html">Đăng nhập</a></p>
+      </section>
+    </main>
+  </div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script><script src="../js/config.js"></script><script src="../js/api.js"></script><script src="../js/utils.js"></script><script src="../js/layout.js"></script><script src="../js/pages/register.js"></script>
+</body>
+</html>

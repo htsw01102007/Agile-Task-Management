@@ -1,6 +1,8 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
+from app.schemas.list import ListResponse
+from app.schemas.task import TaskAssigneeResponse
 
 
 class ProjectCreate(BaseModel):
@@ -45,3 +47,29 @@ class ProjectDetailResponse(ProjectResponse):
     completed_task_count: int = 0
     completion_rate: float = 0.0
     user_role: Optional[str] = None
+
+
+class DashboardSummaryResponse(BaseModel):
+    active_project_count: int
+    assigned_task_count: int
+    pending_task_count: int
+    completed_task_count: int
+
+
+class BoardTaskResponse(BaseModel):
+    """Dữ liệu tối thiểu để vẽ một thẻ Kanban, đã nạp sẵn người thực hiện."""
+    id: int
+    list_id: int
+    title: str
+    priority: str
+    position: int
+    created_by: int
+    due_date: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    assignees: List[TaskAssigneeResponse] = Field(default_factory=list)
+
+
+class ProjectBoardResponse(BaseModel):
+    """Board được tải theo lô để frontend không phải gọi API cho từng task."""
+    lists: List[ListResponse]
+    tasks: List[BoardTaskResponse]

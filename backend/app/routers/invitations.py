@@ -39,7 +39,7 @@ def list_invitations(
     db: Session = Depends(get_db),
     data: tuple[Project, ProjectMember] = Depends(require_project_roles("owner", "manager")),
 ):
-    project, _ = data
+    _, _ = data
     now = datetime.utcnow()
     invitations = (
         db.query(ProjectInvitation)
@@ -64,7 +64,7 @@ def cancel_invitation(
     db: Session = Depends(get_db),
     data: tuple[Project, ProjectMember] = Depends(require_project_roles("owner", "manager")),
 ):
-    project, _ = data
+    project, member = data
     invitation = (
         db.query(ProjectInvitation)
         .filter(
@@ -76,6 +76,8 @@ def cancel_invitation(
     )
     if not invitation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lời mời không tồn tại hoặc đã được xử lý")
+    if member.role == "manager" and invitation.role == "manager":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Manager không thể huỷ lời mời dành cho Manager")
 
     invitation.status = "cancelled"
     invitation.responded_at = datetime.utcnow()

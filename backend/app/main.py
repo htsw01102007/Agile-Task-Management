@@ -6,7 +6,7 @@ from sqlalchemy.exc import OperationalError
 
 from app import models  # noqa: F401
 from app.core.config import settings
-from app.db.session import Base, engine
+from app.db.session import Base, engine, SessionLocal
 from app.routers import (
     health_router, auth_router,
     project_router, project_members_router,
@@ -14,17 +14,28 @@ from app.routers import (
     label_router, task_router, my_tasks_router,
     checklist_router, comment_router, attachment_router,
     notification_router, activity_log_router, ws_router,
+    admin_users_router,
 )
+from app.core.bootstrap import provision_initial_admin
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
         Base.metadata.create_all(bind=engine)
-        print(f"[DB] Đã kết nối MySQL {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
+        print(f"[DB] Connected to MySQL {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
+        with SessionLocal() as db:
+            if provision_initial_admin(db):
+                print("[ADMIN] Administrator account provisioned from .env.")
+            elif settings.ADMIN_EMAIL and settings.ADMIN_USERNAME and settings.ADMIN_PASSWORD:
+                print("[ADMIN] Configured administrator already exists.")
+            else:
+                print("[ADMIN] Initial administrator is not configured; set ADMIN_* values in .env.")
     except OperationalError as error:
-        print("[DB] KHÔNG kết nối được MySQL! Kiểm tra MySQL đã bật chưa và file .env.")
-        print(f"[DB] Chi tiết: {error.orig}")
+        # Keep the API alive so /api/health can return a useful 503 response.
+        # ASCII output avoids crashing under a Windows cp1252 console.
+        print("[DB] Cannot initialize MySQL. Check the service and .env.")
+        print(f"[DB] Detail: {error.orig}")
     yield
 
 
@@ -50,6 +61,7 @@ app.add_middleware(
 # Đăng ký các router với prefix /api
 app.include_router(health_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
+app.include_router(admin_users_router, prefix="/api")
 
 # Project Management routers
 app.include_router(project_router, prefix="/api")

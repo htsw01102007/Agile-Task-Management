@@ -1,4 +1,5 @@
 from sqlalchemy import Column, BigInteger, String, Text, DateTime, ForeignKey, UniqueConstraint, func
+from sqlalchemy.dialects.mysql import BIGINT
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 
@@ -10,7 +11,9 @@ class OAuthAccount(Base):
     )
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
-    user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    # users.id trong schema MySQL hiện có là BIGINT UNSIGNED, nên khóa ngoại
+    # phải dùng đúng kiểu để MySQL chấp nhận khi tạo bảng OAuth.
+    user_id = Column(BIGINT(unsigned=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     provider = Column(String(50), nullable=False)  # "google"
     provider_user_id = Column(String(255), nullable=False)
 

@@ -1,4 +1,7 @@
-from sqlalchemy import Column, BigInteger, String, Text, Integer, Boolean, DateTime, ForeignKey, Enum, func, Index
+from datetime import datetime, timezone
+
+from sqlalchemy import Column, BigInteger, String, Text, Integer, DateTime, ForeignKey, Enum, func, Index
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 from app.models.task_label import TaskLabel  # noqa: F401 - re-export for convenience
@@ -18,10 +21,21 @@ class Task(Base):
     due_date = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
     created_by = Column(BigInteger, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
-    is_deleted = Column(Boolean, nullable=False, default=False, index=True)
     deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+    @hybrid_property
+    def is_deleted(self) -> bool:
+        return self.deleted_at is not None
+
+    @is_deleted.setter
+    def is_deleted(self, value: bool) -> None:
+        self.deleted_at = datetime.now(timezone.utc) if value else None
+
+    @is_deleted.expression
+    def is_deleted(cls):
+        return cls.deleted_at.is_not(None)
 
     __table_args__ = (
         Index("idx_tasks_list_position", "list_id", "position"),
