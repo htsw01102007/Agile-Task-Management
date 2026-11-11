@@ -1,43 +1,51 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Trang chủ | KS25 Base</title>
-  <link rel="icon" href="assets/images/logo.svg">
-  <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tổng quan | Agile Workspace</title>
+  <link rel="icon" href="assets/images/logo.svg"><link rel="stylesheet" href="css/style.css">
 </head>
 <body data-root="./">
-  <header id="app-header"></header>
-
-  <main class="container">
-    <section class="card">
-      <h1>Base code Frontend (HTML · CSS · JS)</h1>
-      <p>Khung dự án cho các nhóm thực tập. Trang này kiểm tra kết nối <strong>Frontend → Backend → MySQL</strong>.</p>
-
-      <p>API đang dùng: <code id="api-url"></code> <span class="muted">(sửa trong <code>js/config.js</code>)</span></p>
-      <div id="health-status" class="status"></div>
-      <button id="btn-recheck" class="btn">Kiểm tra lại</button>
-    </section>
-
-    <section class="card">
-      <h2>Bắt đầu từ đâu?</h2>
-      <ol>
-        <li>Xem trang <a href="pages/items.html">Items</a>: ví dụ thêm / sửa / xoá / tìm kiếm gọi API thật.</li>
-        <li>Đọc <code>js/api.js</code> để biết cách gọi API bằng axios.</li>
-        <li>Tạo trang mới: copy <code>pages/items.html</code> + <code>js/pages/items.js</code>, thêm link vào <code>js/layout.js</code>.</li>
-      </ol>
-    </section>
-  </main>
-
-  <footer id="app-footer"></footer>
-
-  <!-- Thứ tự quan trọng: axios -> config -> api -> utils -> layout -> script riêng của trang -->
-  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/utils.js"></script>
-  <script src="js/layout.js"></script>
-  <script src="js/pages/home.js"></script>
+  <div id="app">
+    <header id="app-header" class="hdr"></header><aside id="app-sidebar" class="side"></aside>
+    <main class="page-content" id="main-content">
+      <div class="crumb">Không gian làm việc <span>›</span> Tổng quan</div>
+      <div class="page-heading"><div><p id="dashboard-date" class="eyebrow"></p><h1 id="dashboard-greeting">Tổng quan công việc</h1><p class="muted">Các dự án và công việc trong không gian làm việc của bạn.</p></div><button id="create-project-button" class="btn btn-primary" type="button" hidden>＋ Tạo dự án</button></div>
+      <section id="dashboard-auth-prompt" class="auth-prompt" hidden><span class="mark">A</span><h2>Đăng nhập để xem không gian làm việc</h2><p class="muted">Số liệu, dự án và công việc chỉ hiển thị sau khi bạn đăng nhập.</p><div><a class="btn btn-primary" href="pages/login.html?next=%2Findex.html">Đăng nhập</a><a class="btn" href="pages/register.html">Tạo tài khoản</a></div></section>
+      <div id="dashboard-content" hidden>
+        <section id="admin-overview" class="admin-overview" hidden aria-label="Tổng quan hệ thống">
+          <div class="panel-heading"><div><p class="eyebrow">QUẢN TRỊ HỆ THỐNG</p><h2>Tổng quan hệ thống</h2><p class="muted">Dữ liệu tổng hợp toàn bộ thành viên, dự án và công việc.</p></div><a class="btn" href="pages/admin-users.html">Quản lý người dùng</a></div>
+          <div class="overview-grid">
+            <article class="metric-card"><span class="metric-icon teal">♙</span><div><p class="metric-label">Tổng tài khoản</p><strong id="admin-metric-users">—</strong></div><span id="admin-metric-active-users" class="metric-note">đang hoạt động</span></article>
+            <article class="metric-card"><span class="metric-icon amber">▦</span><div><p class="metric-label">Dự án</p><strong id="admin-metric-projects">—</strong></div><span id="admin-metric-active-projects" class="metric-note">đang hoạt động</span></article>
+            <article class="metric-card"><span class="metric-icon violet">✓</span><div><p class="metric-label">Tổng công việc</p><strong id="admin-metric-tasks">—</strong></div><span id="admin-metric-completed-tasks" class="metric-note">đã hoàn thành</span></article>
+          </div>
+          <section class="content-panel admin-recent-users"><div class="panel-heading"><div><h2>Tài khoản mới</h2><p class="muted">5 tài khoản đăng ký gần đây nhất.</p></div></div>
+            <div class="table-wrap"><table class="data-table"><thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Ngày tạo</th></tr></thead><tbody id="admin-recent-users"><tr><td colspan="5">Đang tải…</td></tr></tbody></table></div>
+          </section>
+        </section>
+        <section class="overview-grid" aria-label="Tổng quan công việc">
+          <article class="metric-card"><span class="metric-icon teal">▦</span><div><p class="metric-label">Dự án đang hoạt động</p><strong id="metric-projects">—</strong></div><span class="metric-note">dự án bạn tham gia</span></article>
+          <article class="metric-card"><span class="metric-icon amber">◷</span><div><p class="metric-label">Việc đang thực hiện</p><strong id="metric-pending">—</strong></div><span class="metric-note">được giao cho bạn</span></article>
+          <article class="metric-card"><span class="metric-icon violet">✓</span><div><p class="metric-label">Việc đã hoàn thành</p><strong id="metric-completed">—</strong></div><span class="metric-note">được giao cho bạn</span></article>
+        </section>
+        <section class="content-panel"><div class="panel-heading"><div><h2>Dự án của bạn</h2><p class="muted">Dữ liệu lấy từ các dự án bạn là thành viên.</p></div><label class="sr-only" for="project-status-filter">Lọc trạng thái dự án</label><select id="project-status-filter" class="filter-select"><option value="">Mọi trạng thái</option><option value="active">Đang hoạt động</option><option value="completed">Hoàn thành</option><option value="archived">Đã lưu trữ</option></select></div>
+          <div id="project-cards" class="project-cards" aria-live="polite"></div>
+        </section>
+      </div>
+      <dialog id="project-dialog" class="app-dialog">
+        <form id="project-form" method="dialog" class="dialog-form">
+          <div class="dialog-heading"><div><p class="eyebrow">KHÔNG GIAN LÀM VIỆC</p><h2 id="project-form-title">Tạo dự án</h2></div><button class="icon-btn" type="button" data-close-dialog aria-label="Đóng">×</button></div>
+          <label for="project-name">Tên dự án *</label><input id="project-name" name="name" maxlength="200" required>
+          <label for="project-description-input">Mô tả</label><textarea id="project-description-input" name="description" rows="3"></textarea>
+          <div class="form-grid"><div><label for="project-start-date">Ngày bắt đầu</label><input id="project-start-date" name="start_date" type="date"></div><div><label for="project-end-date">Ngày kết thúc</label><input id="project-end-date" name="end_date" type="date"></div></div>
+          <label id="project-status-label" for="project-status-input" hidden>Trạng thái</label><select id="project-status-input" name="status" hidden><option value="active">Đang hoạt động</option><option value="completed">Hoàn thành</option><option value="archived">Lưu trữ</option></select>
+          <div class="dialog-actions"><button class="btn" type="button" data-close-dialog>Huỷ</button><button id="project-submit" class="btn btn-primary" type="submit">Tạo dự án</button></div>
+        </form>
+      </dialog>
+    </main>
+  </div>
+  <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script><script src="js/config.js"></script><script src="js/api.js"></script><script src="js/utils.js"></script><script src="js/layout.js"></script><script src="js/pages/home.js"></script>
 </body>
 </html>

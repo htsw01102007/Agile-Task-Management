@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bảng dự án | Agile Workspace</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../">
+  <div id="app">
+    <header id="app-header" class="hdr"></header>
+    <aside id="app-sidebar" class="side"></aside>
+    <main class="page-content project-page" id="main-content">
+      <div class="crumb"><a href="../index.html">Không gian làm việc</a><span>›</span><span id="project-crumb">Dự án</span></div>
+      <section class="project-heading" aria-labelledby="project-title">
+        <div>
+          <div class="ph"><span id="project-mark" class="project-mark teal">D</span><h1 id="project-title">Đang tải dự án…</h1><span id="project-status" class="chip">Đang tải</span></div>
+          <p id="project-description" class="muted project-description"></p>
+          <div class="project-board-progress"><span id="project-progress-label">0% hoàn thành</span><progress id="project-progress" value="0" max="100"></progress><span id="project-counts"></span></div>
+        </div>
+        <div class="project-actions"><button id="team-button" class="btn" type="button" hidden>♙ Thành viên</button><button id="new-task-button" class="btn btn-primary" type="button" hidden>＋ Thêm công việc</button></div>
+      </section>
+      <p id="readonly-banner" class="readonly-banner" hidden>Dự án đã hoàn thành hoặc lưu trữ — chỉ xem.</p>
+      <section id="board-insights" class="board-insights" aria-label="Thống kê dự án" aria-live="polite">
+        <article class="board-insight"><span class="insight-icon insight-total">▦</span><div><span class="insight-label">Tất cả công việc</span><strong id="stat-total">—</strong></div></article>
+        <article class="board-insight"><span class="insight-icon insight-active">◷</span><div><span class="insight-label">Đang thực hiện</span><strong id="stat-active">—</strong></div></article>
+        <article class="board-insight"><span class="insight-icon insight-done">✓</span><div><span class="insight-label">Hoàn thành</span><strong id="stat-completed">—</strong></div></article>
+        <article class="board-insight"><span class="insight-icon insight-overdue">!</span><div><span class="insight-label">Quá hạn</span><strong id="stat-overdue">—</strong></div></article>
+      </section>
+      <nav class="tabs" aria-label="Các chế độ xem dự án"><a class="active" href="#board" aria-current="page" data-project-tab="board">▦ Bảng</a><a href="#members" data-project-tab="members">Thành viên</a><a href="#activity" data-project-tab="activity">Nhật ký</a></nav>
+      <div class="board-toolbar">
+        <p id="board-summary" class="muted">Đang tải bảng công việc…</p>
+        <div class="board-controls">
+          <label class="board-search"><span aria-hidden="true">⌕</span><input id="task-search" type="search" placeholder="Tìm trong bảng" aria-label="Tìm công việc trong bảng"></label>
+          <label class="sr-only" for="priority-filter">Lọc theo độ ưu tiên</label>
+          <select id="priority-filter" class="filter-select">
+            <option value="">Mọi ưu tiên</option><option value="urgent">Khẩn</option><option value="high">Cao</option><option value="medium">Trung bình</option><option value="low">Thấp</option>
+          </select>
+          <button id="trash-button" class="filter-btn" type="button" hidden>Thùng rác</button>
+          <button id="retry-board" class="filter-btn" type="button" hidden>Thử lại</button>
+        </div>
+      </div>
+      <section id="board" class="board" aria-label="Bảng công việc" aria-busy="true"></section>
+      <section id="activity-panel" class="content-panel activity-panel" hidden><div class="panel-heading"><div><h2>Nhật ký dự án</h2><p class="muted">Lịch sử thay đổi và hoạt động của các thành viên.</p></div></div><div id="activity-list"></div></section>
+      <dialog id="task-dialog" class="app-dialog task-dialog">
+        <form id="task-form" class="dialog-form">
+          <div class="dialog-heading"><div><p id="task-dialog-context" class="eyebrow">CÔNG VIỆC</p><h2 id="task-dialog-title">Tạo công việc</h2></div><button class="icon-btn" type="button" data-close-task aria-label="Đóng">×</button></div>
+          <div class="task-editor-grid">
+            <section class="task-editor-main">
+              <label for="task-title">Tiêu đề *</label><input id="task-title" name="title" maxlength="255" required>
+              <label for="task-description">Mô tả</label><textarea id="task-description" name="description" rows="4"></textarea>
+              <label>Danh sách</label><select id="task-list" name="list_id"></select>
+              <section id="checklist-panel" class="task-subpanel" hidden><div class="subpanel-heading"><h3>Checklist</h3><span id="checklist-progress"></span></div><div id="checklist-items"></div><div id="checklist-form" class="inline-form"><input name="content" maxlength="500" placeholder="Thêm mục checklist"><button class="btn btn-small" type="button">Thêm</button></div></section>
+              <section id="comments-panel" class="task-subpanel" hidden><div class="subpanel-heading"><h3>Bình luận</h3></div><div id="task-comments"></div><div id="comment-form" class="inline-form"><textarea name="content" rows="2" placeholder="Viết bình luận…"></textarea><button class="btn btn-small btn-primary" type="button">Gửi</button></div></section>
+              <section id="attachments-panel" class="task-subpanel" hidden><div class="subpanel-heading"><h3>Tệp đính kèm</h3><span class="muted">Tối đa 10 MB mỗi tệp</span></div><div id="task-attachments"></div><label id="attachment-upload-label" class="attachment-upload">＋ Đính kèm tệp<input id="attachment-upload" type="file" hidden></label></section>
+            </section>
+            <aside class="task-editor-side">
+              <label for="task-priority">Độ ưu tiên</label><select id="task-priority" name="priority"><option value="low">Thấp</option><option value="medium">Trung bình</option><option value="high">Cao</option><option value="urgent">Khẩn</option></select>
+              <label for="task-start-date">Ngày bắt đầu</label><input id="task-start-date" name="start_date" type="datetime-local">
+              <label for="task-due-date">Hạn chót</label><input id="task-due-date" name="due_date" type="datetime-local">
+              <label for="task-assignees">Người thực hiện</label><select id="task-assignees" name="assignee_ids" multiple size="4"></select>
+              <p id="task-completed-at" class="muted task-readonly"></p><p id="task-created-by" class="muted task-readonly"></p>
+            </aside>
+          </div>
+          <div class="dialog-actions"><button id="task-delete" class="btn btn-danger" type="button" hidden>Xoá công việc</button><span class="grow"></span><button class="btn" type="button" data-close-task>Huỷ</button><button id="task-submit" class="btn btn-primary" type="submit">Tạo công việc</button></div>
+        </form>
+      </dialog>
+      <dialog id="team-dialog" class="app-dialog">
+        <div class="dialog-form">
+          <div class="dialog-heading"><div><p class="eyebrow">DỰ ÁN</p><h2>Thành viên và lời mời</h2></div><button class="icon-btn" type="button" data-close-team aria-label="Đóng">×</button></div>
+          <form id="invite-form" class="invite-form"><label for="invite-email">Email thành viên</label><input id="invite-email" name="invitee_email" type="email" placeholder="ten@example.com" required><label for="invite-role">Vai trò</label><select id="invite-role" name="role"><option value="member">Thành viên</option><option value="viewer">Người xem</option><option value="manager">Quản lý</option></select><button class="btn btn-primary" type="submit">Gửi lời mời</button></form>
+          <div id="invite-result" class="invite-result" hidden></div>
+          <section class="team-section"><h3>Thành viên</h3><div id="project-members"></div></section>
+          <section class="team-section"><h3>Lời mời đang chờ</h3><div id="project-invitations"></div></section>
+        </div>
+      </dialog>
+      <dialog id="trash-dialog" class="app-dialog">
+        <div class="dialog-form"><div class="dialog-heading"><div><p class="eyebrow">DỰ ÁN</p><h2>Thùng rác công việc</h2></div><button class="icon-btn" type="button" data-close-trash aria-label="Đóng">×</button></div><div id="deleted-tasks"></div></div>
+      </dialog>
+    </main>
+  </div>
+  <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/project.js"></script>
+</body>
+</html>
