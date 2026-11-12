@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Danh sách cột (Lists)</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  </head>
+  <body>
+    <main class="container">
+      <h1>Cột công việc — Project #1</h1>
+
+      <p>
+        Đang đăng nhập với user ID:
+        <input
+          id="user-id"
+          type="number"
+          value="2"
+          min="1"
+          style="width: 70px"
+        />
+        (2 = manager; thử 3 = member hoặc 4 = viewer để thấy bị chặn 403)
+      </p>
+
+      <!-- Form thêm mới -->
+      <form id="list-form" class="card">
+        <h2 id="form-title">Thêm cột mới</h2>
+        <input
+          name="name"
+          placeholder="Tên cột (VD: Đang làm)"
+          required
+          maxlength="100"
+        />
+        <label
+          ><input type="checkbox" name="is_done_column" /> Đây là cột hoàn
+          thành</label
+        >
+        <button type="submit" id="btn-submit">Thêm</button>
+        <button type="button" id="btn-cancel" hidden>Huỷ</button>
+      </form>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Tên</th>
+            <th>Position</th>
+            <th>Cột hoàn thành</th>
+            <th>Hành động</th>
+          </tr>
+        </thead>
+        <tbody id="list-table-body"></tbody>
+      </table>
+    </main>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/pages/lists.js"></script>
+  </body>
+</html>

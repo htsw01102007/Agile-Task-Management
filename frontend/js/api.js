@@ -3,6 +3,7 @@
 //
 // Cách dùng (trong các file js/pages/*.js):
 //   const items = await api.get("/items");
+//   (mỗi hàm nhận thêm tham số cuối `headers` tuỳ chọn, VD: { "X-User-Id": 2 })
 //   const items = await api.get("/items", { q: "com" });          // -> /items?q=com
 //   const created = await api.post("/items", { name: "Trà đá", price: 5000 });
 //   await api.put("/items/1", { name: "Tên mới" });
@@ -59,9 +60,10 @@ http.interceptors.response.use(
   },
 );
 
+// Tham số cuối `headers` tuỳ chọn: dùng để gửi X-User-Id khi chưa có login.
 const api = {
-  get: (path, params) => http.get(path, { params }).then((res) => res.data),
-  post: (path, body) => http.post(path, body).then((res) => res.data),
-  put: (path, body) => http.put(path, body).then((res) => res.data),
-  delete: (path) => http.delete(path).then((res) => res.data),
+  get: (path, params, headers) => http.get(path, { params, headers }).then((res) => res.data),
+  post: (path, body, headers) => http.post(path, body, { headers }).then((res) => res.data),
+  put: (path, body, headers) => http.put(path, body, { headers }).then((res) => res.data),
+  delete: (path, headers) => http.delete(path, { headers }).then((res) => res.data),
 };
