@@ -12,7 +12,7 @@ from sqlalchemy.exc import OperationalError
 from app import models  # noqa: F401 - import để SQLAlchemy biết các bảng
 from app.core.config import settings
 from app.db.session import Base, engine
-from app.routers import health, items, lists
+from app.routers import health, items, lists, tasks, tasks
 
 
 @asynccontextmanager
@@ -44,6 +44,8 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api")
 app.include_router(items.router, prefix="/api")
 app.include_router(lists.router, prefix="/api")
+app.include_router(tasks.router, prefix="/api")
+app.include_router(tasks.router, prefix="/api")
 
 
 @app.get("/")

@@ -8,3 +8,4 @@ from app.models.list import ListModel  # noqa: F401
 from app.models.task import Task, TaskAssignee, TaskLabel  # noqa: F401
 from app.models.label import Label  # noqa: F401
 from app.models.checklist import ChecklistItem  # noqa: F401
+from app.models.comment import Comment, Attachment, ActivityLog  # noqa: F401

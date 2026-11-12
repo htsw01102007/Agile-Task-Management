@@ -59,3 +59,9 @@ SELECT p.id, c.name, c.pos, c.done FROM projects p JOIN (
   UNION SELECT 'Đang làm', 2, 0
   UNION SELECT 'Hoàn thành', 3, 1
 ) c WHERE p.name = 'Dự án mẫu';
+
+-- Ràng buộc nghiệp vụ tasks (MySQL 8.0.16+ mới hỗ trợ CHECK):
+-- Hạn chót phải sau hoặc bằng ngày bắt đầu (một trong hai có thể NULL).
+-- Bảng đã tồn tại rồi thì chạy riêng câu ALTER dưới đây.
+ALTER TABLE tasks ADD CONSTRAINT chk_tasks_dates
+  CHECK (due_date IS NULL OR start_date IS NULL OR due_date >= start_date);

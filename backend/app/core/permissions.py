@@ -12,7 +12,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.models.list import ListModel
 from app.models.project_member import ProjectMember
+from app.models.task import Task
 
 ROLE_LEVEL = {"viewer": 1, "member": 2, "manager": 3, "owner": 4}
 
@@ -27,8 +29,27 @@ def get_current_user_id(x_user_id: int | None = Header(default=None)) -> int:
     return x_user_id
 
 
+def _check_membership(
+    project_id: int, user_id: int, db: Session, minimum_level: int
+) -> ProjectMember:
+    membership = db.scalar(
+        select(ProjectMember).where(
+            ProjectMember.project_id == project_id,
+            ProjectMember.user_id == user_id,
+        )
+    )
+    if membership is None:
+        raise HTTPException(status_code=403, detail="Bạn không thuộc project này")
+    if ROLE_LEVEL[membership.role] < minimum_level:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Cần vai trò manager trở lên (bạn là {membership.role})",
+        )
+    return membership
+
+
 def require_role(minimum_role: str):
-    """Dependency factory: kiểm tra user có role đủ cao trong project :project_id."""
+    """Dependency cho route /projects/{project_id}/... : kiểm tra trực tiếp."""
     minimum_level = ROLE_LEVEL[minimum_role]
 
     def checker(
@@ -36,19 +57,41 @@ def require_role(minimum_role: str):
         user_id: int = Depends(get_current_user_id),
         db: Session = Depends(get_db),
     ) -> ProjectMember:
-        membership = db.scalar(
-            select(ProjectMember).where(
-                ProjectMember.project_id == project_id,
-                ProjectMember.user_id == user_id,
-            )
-        )
-        if membership is None:
-            raise HTTPException(status_code=403, detail="Bạn không thuộc project này")
-        if ROLE_LEVEL[membership.role] < minimum_level:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Cần vai trò {minimum_role} trở lên (bạn là {membership.role})",
-            )
-        return membership
+        return _check_membership(project_id, user_id, db, minimum_level)
+
+    return checker
+
+
+def require_list_role(minimum_role: str):
+    """Dependency cho route /lists/{list_id}/... : tra project_id từ list."""
+    minimum_level = ROLE_LEVEL[minimum_role]
+
+    def checker(
+        list_id: int = Path(...),
+        user_id: int = Depends(get_current_user_id),
+        db: Session = Depends(get_db),
+    ) -> ListModel:
+        parent = db.get(ListModel, list_id)
+        if parent is None:
+            raise HTTPException(status_code=404, detail=f"Không tìm thấy list id={list_id}")
+        _check_membership(parent.project_id, user_id, db, minimum_level)
+        return parent
+
+    return checker
+
+
+def require_task_role(minimum_role: str):
+    """Dependency cho route có {task_id}: tra project_id qua list của task."""
+    minimum_level = ROLE_LEVEL[minimum_role]
+
+    def checker(
+        task_id: int = Path(...),
+        user_id: int = Depends(get_current_user_id),
+        db: Session = Depends(get_db),
+    ) -> None:
+        task = db.get(Task, task_id)
+        if task is None:
+            raise HTTPException(status_code=404, detail=f"Không tìm thấy task id={task_id}")
+        _check_membership(task.project_id, user_id, db, minimum_level)
 
     return checker
