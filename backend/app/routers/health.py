@@ -1,7 +1,6 @@
-"""Kiểm tra server và kết nối DB còn sống không: GET /api/health"""
-from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -13,9 +12,15 @@ router = APIRouter(tags=["Health"])
 def health_check(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
-        return {"status": "ok", "database": "connected"}
-    except Exception as error:  # noqa: BLE001 - muốn bắt mọi lỗi kết nối để báo ra
-        return JSONResponse(
-            status_code=503,
-            content={"status": "error", "database": "disconnected", "detail": str(error)},
+        return {
+            "status": "ok",
+            "database": "connected",
+            "message": "Service is running healthy",
+        }
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database connection error: {exc}",
         )
+
+

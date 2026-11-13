@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Đăng nhập | Agile Workspace</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../">
+  <div id="app">
+    <header id="app-header" class="hdr"></header>
+    <aside id="app-sidebar" class="side"></aside>
+    <main class="page-content auth-page" id="main-content">
+      <div class="crumb"><a href="../index.html">Không gian làm việc</a><span>›</span><span>Đăng nhập</span></div>
+      <section class="auth-card" aria-labelledby="login-title">
+        <span class="mark auth-mark">A</span>
+        <h1 id="login-title">Chào mừng trở lại</h1>
+        <p class="muted">Đăng nhập để xem dự án và bảng công việc của bạn.</p>
+        <form id="login-form">
+          <label for="identifier">Email hoặc tên đăng nhập</label>
+          <input id="identifier" name="identifier" type="text" autocomplete="username" required>
+          <label for="password">Mật khẩu</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+          <button id="login-submit" class="btn btn-primary" type="submit">Đăng nhập</button>
+        </form>
+        <p class="auth-switch">Chưa có tài khoản? <a href="register.html">Đăng ký</a></p>
+      </section>
+    </main>
+  </div>
+  <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/login.js"></script>
+</body>
+</html>

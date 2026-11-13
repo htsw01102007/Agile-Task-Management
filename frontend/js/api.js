@@ -26,12 +26,13 @@ const http = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Muốn gửi token đăng nhập cho mọi request (khi nhóm làm chức năng login), bỏ comment đoạn dưới:
-// http.interceptors.request.use((config) => {
-//   const token = localStorage.getItem("token");
-//   if (token) config.headers.Authorization = `Bearer ${token}`;
-//   return config;
-// });
+// Gửi access token nếu ứng dụng đã đăng nhập. Giữ "token" để tương thích
+// với frontend cũ, còn luồng đăng nhập mới có thể lưu "access_token".
+http.interceptors.request.use((config) => {
+  const token = localStorage.getItem("access_token") || localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
 // Lấy câu thông báo lỗi dễ đọc từ response của FastAPI
 function getErrorMessage(data, status) {
@@ -46,7 +47,25 @@ function getErrorMessage(data, status) {
 // Gom xử lý lỗi một chỗ: đổi lỗi của axios thành ApiError dễ dùng
 http.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const request = error.config;
+    const isAuthRequest = request?.url?.includes("/auth/login") || request?.url?.includes("/auth/refresh");
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (error.response?.status === 401 && request && !request._retry && !isAuthRequest && refreshToken) {
+      request._retry = true;
+      try {
+        const response = await axios.post(`${CONFIG.API_BASE_URL}/auth/refresh`, { refresh_token: refreshToken });
+        localStorage.setItem("access_token", response.data.access_token);
+        localStorage.setItem("refresh_token", response.data.refresh_token);
+        request.headers.Authorization = `Bearer ${response.data.access_token}`;
+        return http(request);
+      } catch {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("token");
+        window.dispatchEvent(new CustomEvent("auth:expired"));
+      }
+    }
     if (error.response) {
       // Server có trả lời nhưng là lỗi (4xx, 5xx)
       const { status, data } = error.response;
@@ -54,7 +73,7 @@ http.interceptors.response.use(
     }
     // Không có response: server tắt, sai URL, bị chặn CORS, hoặc quá thời gian chờ
     return Promise.reject(new ApiError(
-      "Không kết nối được backend. Backend đã chạy chưa? Kiểm tra CONFIG.API_BASE_URL.", 0,
+      `Không nhận được phản hồi từ backend (${CONFIG.API_BASE_URL}). Kiểm tra Uvicorn, địa chỉ API và CORS.`, 0,
     ));
   },
 );
@@ -63,5 +82,7 @@ const api = {
   get: (path, params) => http.get(path, { params }).then((res) => res.data),
   post: (path, body) => http.post(path, body).then((res) => res.data),
   put: (path, body) => http.put(path, body).then((res) => res.data),
-  delete: (path) => http.delete(path).then((res) => res.data),
+  patch: (path, body) => http.patch(path, body).then((res) => res.data),
+  delete: (path, params) => http.delete(path, { params }).then((res) => res.data),
+  health: () => http.get("/health").then((res) => res.data),
 };
