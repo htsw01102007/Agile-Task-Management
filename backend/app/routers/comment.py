@@ -1,3 +1,4 @@
+import json
 import re
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -132,7 +133,7 @@ def create_comment(
         entity_type="comment",
         entity_id=comment.id,
         action="created",
-        new_value=f'{{"content": "{comment_in.content[:200]}"}}',
+        new_value=json.dumps({"content": comment_in.content[:200]}, ensure_ascii=False),
     )
     db.add(log)
     db.commit()
@@ -164,7 +165,7 @@ def update_comment(
     comment_id: int,
     comment_update: CommentUpdate,
     db: Session = Depends(get_db),
-    data: tuple = Depends(get_task_and_membership),
+    data: tuple = Depends(get_task_with_write_check),
 ):
     """Cập nhật bình luận (tác giả hoặc owner/manager)"""
     task, member = data
@@ -218,7 +219,7 @@ def delete_comment(
     task_id: int,
     comment_id: int,
     db: Session = Depends(get_db),
-    data: tuple = Depends(get_task_and_membership),
+    data: tuple = Depends(get_task_with_write_check),
 ):
     """Xoá bình luận (tác giả tự xoá, hoặc owner/manager xoá được của người khác)"""
     task, member = data

@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from app.models.user import User
 from app.models.oauth_account import OAuthAccount
 from app.models.password_reset_token import PasswordResetToken
+from app.models.revoked_token import RevokedToken
 from app.schemas.auth import (
     RegisterRequest,
     LoginRequest,
@@ -21,7 +22,9 @@ from app.core.security import (
     verify_password,
     create_access_token,
     create_refresh_token,
+    decode_access_token,
     decode_refresh_token,
+    get_token_identifier,
     generate_reset_token,
     hash_reset_token,
 )
@@ -321,3 +324,17 @@ def authenticate_google_user(
 
     return issue_tokens(db, user)
 
+
+
+def logout_user(db: Session, token: str) -> MessageResponse:
+    payload = decode_access_token(token)
+    token_id = get_token_identifier(token, payload)
+    now = datetime.now(timezone.utc)
+    exp_ts = payload.get("exp")
+    expires_at = datetime.fromtimestamp(exp_ts, tz=timezone.utc) if exp_ts else now
+
+    db.query(RevokedToken).filter(RevokedToken.expires_at < now).delete(synchronize_session=False)
+    if db.query(RevokedToken.id).filter(RevokedToken.jti == token_id).first() is None:
+        db.add(RevokedToken(jti=token_id, expires_at=expires_at))
+    db.commit()
+    return MessageResponse(message="Đăng xuất thành công")

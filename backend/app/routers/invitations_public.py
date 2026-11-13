@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
@@ -6,6 +7,7 @@ from datetime import datetime
 from app.db.session import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
+from app.models.project import Project
 from app.models.project_invitation import ProjectInvitation
 from app.models.project_member import ProjectMember
 from app.models.notification import Notification
@@ -25,7 +27,11 @@ def list_my_invitations(
     now = datetime.utcnow()
     invitations = (
         db.query(ProjectInvitation)
-        .filter(ProjectInvitation.invitee_email == current_user.email)
+        .join(Project, Project.id == ProjectInvitation.project_id)
+        .filter(
+            func.lower(ProjectInvitation.invitee_email) == current_user.email.lower(),
+            Project.deleted_at.is_(None),
+        )
         .order_by(ProjectInvitation.created_at.desc())
         .all()
     )

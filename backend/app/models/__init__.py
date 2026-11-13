@@ -13,6 +13,7 @@ from app.models.comment import Comment
 from app.models.attachment import Attachment
 from app.models.notification import Notification
 from app.models.activity_log import ActivityLog
+from app.models.revoked_token import RevokedToken
 
 __all__ = [
     "User",
@@ -31,4 +32,5 @@ __all__ = [
     "Attachment",
     "Notification",
     "ActivityLog",
+    "RevokedToken",
 ]

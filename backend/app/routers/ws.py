@@ -1,10 +1,11 @@
 from typing import Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, status
 
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, get_token_identifier
 from app.core.ws_manager import ws_manager
 from app.db.session import SessionLocal
 from app.models.user import User
+from app.models.revoked_token import RevokedToken
 from app.models.project import Project
 from app.models.project_member import ProjectMember
 
@@ -12,13 +13,22 @@ router = APIRouter(prefix="/ws", tags=["WebSocket Realtime"])
 
 
 def _authenticate_ws_token(token: Optional[str]) -> Optional[int]:
-    """Xác thực JWT access_token từ query param cho kết nối WebSocket."""
+    """Xác thực JWT access_token từ query param cho kết nối WebSocket (kiểm tra cả thu hồi token)."""
     if not token:
         return None
     try:
         payload = decode_access_token(token)
-        uid = payload.get("user_id") if payload.get("user_id") is not None else payload.get("sub")
-        return int(uid) if uid is not None else None
+        uid = payload.get("user_id")
+        if uid is None:
+            return None
+        token_id = get_token_identifier(token, payload)
+        db = SessionLocal()
+        try:
+            if db.query(RevokedToken.id).filter(RevokedToken.jti == token_id).first() is not None:
+                return None
+        finally:
+            db.close()
+        return int(uid)
     except (ValueError, TypeError):
         return None
 

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
+import json
 import os
 import uuid
 import mimetypes
@@ -94,7 +95,7 @@ def upload_attachment(
     task, member = data
     mime_type = _resolve_and_validate_mime(file)
 
-    content = file.file.read()
+    content = file.file.read(MAX_FILE_SIZE + 1)
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -125,7 +126,7 @@ def upload_attachment(
         entity_type="attachment",
         entity_id=attachment.id,
         action="created",
-        new_value=f'{{"file_name": "{attachment.file_name}", "file_size": {len(content)}}}',
+        new_value=json.dumps({"file_name": attachment.file_name, "file_size": len(content)}, ensure_ascii=False),
     )
     db.add(log)
     db.commit()

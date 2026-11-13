@@ -6,7 +6,7 @@ from authlib.integrations.starlette_client import OAuth
 from authlib.integrations.base_client.errors import OAuthError
 
 from app.db.session import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, oauth2_scheme
 from app.core.config import settings
 from app.schemas.auth import (
     RegisterRequest,
@@ -37,6 +37,16 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     """Đăng nhập bằng Email hoặc Username + Mật khẩu. Trả về access_token + refresh_token."""
     return auth_crud.authenticate_user(db, body)
+
+
+@router.post("/logout", response_model=MessageResponse, summary="Đăng xuất và thu hồi access token")
+def logout(
+    token: str = Depends(oauth2_scheme),
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Thu hồi access_token hiện tại ngay lập tức."""
+    return auth_crud.logout_user(db, token)
 
 
 # ── 2. Làm mới Token ──────────────────────────────────────

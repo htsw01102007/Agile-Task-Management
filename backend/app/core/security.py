@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+import uuid
 import bcrypt
 import jwt
 from datetime import datetime, timezone, timedelta
@@ -27,7 +28,16 @@ def create_access_token(data: dict, expires_minutes: int | None = None) -> str:
     minutes = expires_minutes or settings.ACCESS_TOKEN_EXPIRE_MINUTES
     payload["type"] = ACCESS_TOKEN_TYPE
     payload["exp"] = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    payload.setdefault("jti", str(uuid.uuid4()))
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def get_token_identifier(token: str, payload: dict) -> str:
+    """Lấy jti của JWT (fallback sha256 của token nếu token cũ chưa có jti)."""
+    jti = payload.get("jti")
+    if jti:
+        return str(jti)
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def create_refresh_token(data: dict, expires_days: int | None = None) -> str:
