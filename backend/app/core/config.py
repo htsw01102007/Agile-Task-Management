@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     DB_NAME: str = "task_project_management"
 
     # JWT Security
-    SECRET_KEY: str = "37da485fb46bad455e73ea0f2e2594ceedb41fb57dc221bfc4314288de3a22e4"
+    SECRET_KEY: str = "37da485fb46bad455e73ea0f2e2594ceedb41fb57dc221bfcfvkjbhadgzdfkhgfchxhf4314288de3a22e4"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
