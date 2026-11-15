@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
@@ -7,6 +7,7 @@ import os
 import uuid
 import mimetypes
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.core.permissions import get_task_and_membership, get_task_with_write_check
 from app.core.ws_manager import notify_project_sync
@@ -16,7 +17,7 @@ from app.schemas.attachment import AttachmentResponse, AttachmentUploadResponse
 
 router = APIRouter(prefix="/projects/{project_id}/tasks/{task_id}/attachments", tags=["Attachments"])
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = settings.UPLOAD_DIR
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -83,8 +84,72 @@ def list_attachments(
     return result
 
 
+def _validate_file_signature(mime_type: str, content: bytes) -> None:
+    """Kiểm tra magic bytes / nội dung thực của file khớp với MIME type được phép."""
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File tải lên không được để trống",
+        )
+
+    valid = False
+    if mime_type == "image/png":
+        valid = content.startswith(b"\x89PNG\r\n\x1a\n")
+    elif mime_type == "image/jpeg":
+        valid = content.startswith(b"\xff\xd8\xff")
+    elif mime_type == "image/gif":
+        valid = content.startswith((b"GIF87a", b"GIF89a"))
+    elif mime_type == "image/webp":
+        valid = len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"
+    elif mime_type == "application/pdf":
+        valid = content.startswith(b"%PDF-")
+    elif mime_type in {
+        "application/zip",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }:
+        valid = content.startswith((b"PK\x03\x04", b"PK\x05\x06"))
+    elif mime_type == "application/x-rar-compressed":
+        valid = content.startswith(b"Rar!\x1a\x07")
+    elif mime_type in {"application/msword", "application/vnd.ms-excel"}:
+        valid = content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
+    elif mime_type in {"text/plain", "text/csv"}:
+        if b"\x00" not in content:
+            try:
+                content.decode("utf-8")
+                valid = True
+            except UnicodeDecodeError:
+                valid = False
+
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nội dung file không khớp với định dạng được phép",
+        )
+
+
+def _read_upload_bounded(file: UploadFile) -> bytes:
+    """Đọc dữ liệu upload theo từng chunk và chặn vượt quá MAX_FILE_SIZE."""
+    chunks: list[bytes] = []
+    total = 0
+    chunk_size = 64 * 1024
+    while True:
+        chunk = file.file.read(chunk_size)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File quá lớn (tối đa {MAX_FILE_SIZE // (1024 * 1024)}MB)",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 @router.post("", response_model=AttachmentUploadResponse, status_code=status.HTTP_201_CREATED)
 def upload_attachment(
+    request: Request,
     project_id: int,
     task_id: int,
     file: UploadFile = File(...),
@@ -93,14 +158,17 @@ def upload_attachment(
 ):
     """Tải lên tệp đính kèm cho task (tối đa 10MB)"""
     task, member = data
-    mime_type = _resolve_and_validate_mime(file)
+    raw_content_length = request.headers.get("content-length")
+    if raw_content_length and raw_content_length.isdigit():
+        if int(raw_content_length) > MAX_FILE_SIZE + 64 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File quá lớn (tối đa {MAX_FILE_SIZE // (1024 * 1024)}MB)",
+            )
 
-    content = file.file.read(MAX_FILE_SIZE + 1)
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File quá lớn (tối đa {MAX_FILE_SIZE // (1024 * 1024)}MB)",
-        )
+    mime_type = _resolve_and_validate_mime(file)
+    content = _read_upload_bounded(file)
+    _validate_file_signature(mime_type, content)
 
     ext = os.path.splitext(file.filename)[1] if file.filename else ""
     unique_name = f"{uuid.uuid4().hex}{ext}"
@@ -108,29 +176,35 @@ def upload_attachment(
     with open(file_path, "wb") as f:
         f.write(content)
 
-    attachment = Attachment(
-        task_id=task_id,
-        user_id=member.user_id,
-        file_name=file.filename or unique_name,
-        file_path=file_path,
-        file_size=len(content),
-        mime_type=mime_type,
-    )
-    db.add(attachment)
-    db.flush()
+    try:
+        attachment = Attachment(
+            task_id=task_id,
+            user_id=member.user_id,
+            file_name=file.filename or unique_name,
+            file_path=file_path,
+            file_size=len(content),
+            mime_type=mime_type,
+        )
+        db.add(attachment)
+        db.flush()
 
-    log = ActivityLog(
-        project_id=project_id,
-        task_id=task_id,
-        user_id=member.user_id,
-        entity_type="attachment",
-        entity_id=attachment.id,
-        action="created",
-        new_value=json.dumps({"file_name": attachment.file_name, "file_size": len(content)}, ensure_ascii=False),
-    )
-    db.add(log)
-    db.commit()
-    db.refresh(attachment)
+        log = ActivityLog(
+            project_id=project_id,
+            task_id=task_id,
+            user_id=member.user_id,
+            entity_type="attachment",
+            entity_id=attachment.id,
+            action="created",
+            new_value=json.dumps({"file_name": attachment.file_name, "file_size": len(content)}, ensure_ascii=False),
+        )
+        db.add(log)
+        db.commit()
+        db.refresh(attachment)
+    except Exception:
+        db.rollback()
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise
 
     download_url = f"/api/projects/{project_id}/tasks/{task_id}/attachments/{attachment.id}/download"
     resp = AttachmentUploadResponse(

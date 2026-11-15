@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 from datetime import datetime
 from typing import Annotated
@@ -91,3 +92,7 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: StrongPassword
 
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None

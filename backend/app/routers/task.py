@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
 from sqlalchemy import case
 from sqlalchemy.orm import Session
@@ -16,6 +17,7 @@ from app.core.permissions import (
     get_task_for_restore,
     validate_assignees_not_viewers,
 )
+from app.core.config import settings
 from app.core.deps import get_current_user
 from app.core.ws_manager import notify_project_sync, notify_user_sync
 from app.models.user import User
@@ -43,7 +45,7 @@ from app.schemas.checklist import ChecklistItemResponse
 router = APIRouter(prefix="/projects/{project_id}/tasks", tags=["Tasks"])
 my_tasks_router = APIRouter(prefix="/tasks", tags=["My Tasks"])
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = settings.UPLOAD_DIR
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -606,8 +608,18 @@ def update_task(
             json.dumps({"list_id": new_list.id, "position": task.position}),
         )
     elif "position" in update_data and update_data["position"] is not None:
-        task.position = update_data["position"]
-        _renumber_list_tasks(db, task.list_id)
+        siblings = (
+            db.query(Task)
+            .filter(Task.list_id == task.list_id, Task.is_deleted.is_(False), Task.id != task.id)
+            .order_by(Task.position.asc(), Task.id.asc())
+            .all()
+        )
+        target_pos = max(0, min(update_data["position"], len(siblings)))
+        siblings.insert(target_pos, task)
+        for idx, item in enumerate(siblings):
+            item.position = idx
+        if task.position != old_position:
+            changes["position"] = {"old": str(old_position), "new": str(task.position)}
 
     if changes:
         _create_activity_log(
@@ -728,12 +740,21 @@ def reorder_tasks(
     if len(list_ids) > 1:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chỉ có thể sắp xếp task trong cùng một danh sách")
 
-    task_map = {t.id: t for t in tasks}
-    ordered_tasks = []
-    for idx, tid in enumerate(reorder.task_ids):
-        t = task_map[tid]
-        t.position = idx
-        ordered_tasks.append(t)
+    target_list_id = next(iter(list_ids))
+    all_list_tasks = (
+        db.query(Task)
+        .filter(Task.list_id == target_list_id, Task.project_id == project_id, Task.is_deleted.is_(False))
+        .order_by(Task.position.asc(), Task.id.asc())
+        .all()
+    )
+    task_map = {t.id: t for t in all_list_tasks}
+    seen_ids = list(dict.fromkeys(reorder.task_ids))
+    ordered_tasks = [task_map[tid] for tid in seen_ids]
+    for item in all_list_tasks:
+        if item.id not in seen_ids:
+            ordered_tasks.append(item)
+    for idx, item in enumerate(ordered_tasks):
+        item.position = idx
 
     db.commit()
     notify_project_sync(

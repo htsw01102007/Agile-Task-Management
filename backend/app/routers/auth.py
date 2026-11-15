@@ -1,3 +1,4 @@
+from __future__ import annotations
 from urllib.parse import quote_plus
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import RedirectResponse
@@ -14,6 +15,7 @@ from app.schemas.auth import (
     UserOut,
     TokenResponse,
     RefreshRequest,
+    LogoutRequest,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     ResetPasswordRequest,
@@ -39,14 +41,20 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
     return auth_crud.authenticate_user(db, body)
 
 
-@router.post("/logout", response_model=MessageResponse, summary="Đăng xuất và thu hồi access token")
+@router.post("/logout", response_model=MessageResponse, summary="Đăng xuất và thu hồi access/refresh token")
 def logout(
+    body: LogoutRequest | None = None,
     token: str = Depends(oauth2_scheme),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Thu hồi access_token hiện tại ngay lập tức."""
-    return auth_crud.logout_user(db, token)
+    """Thu hồi access_token và refresh_token của phiên hiện tại ngay lập tức."""
+    return auth_crud.logout_user(
+        db,
+        token,
+        refresh_token_str=body.refresh_token if body else None,
+        user_id=current_user.id,
+    )
 
 
 # ── 2. Làm mới Token ──────────────────────────────────────

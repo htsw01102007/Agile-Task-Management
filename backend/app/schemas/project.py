@@ -35,6 +35,8 @@ class ProjectResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime] = None
+    my_role: Optional[str] = None  # vai trò của tôi trong dự án (owner/manager/member/viewer)
+    user_role: Optional[str] = None
 
 
 class ProjectDetailResponse(ProjectResponse):
@@ -44,4 +46,3 @@ class ProjectDetailResponse(ProjectResponse):
     task_count: int = 0
     completed_task_count: int = 0
     completion_rate: float = 0.0
-    user_role: Optional[str] = None

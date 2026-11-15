@@ -8,11 +8,12 @@ CREATE TABLE users (
     id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     email           VARCHAR(255) NOT NULL,
     username        VARCHAR(50)  NOT NULL,
-    password_hash   VARCHAR(255) NOT NULL,
+    password_hash   VARCHAR(255) NULL,
     full_name       VARCHAR(150) NOT NULL,
     avatar_url      VARCHAR(500) NULL,
     system_role     ENUM('admin', 'user') NOT NULL DEFAULT 'user',
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    token_version   INT NOT NULL DEFAULT 0,
     last_login_at   DATETIME NULL,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -229,6 +230,15 @@ CREATE TABLE password_reset_tokens (
     CONSTRAINT uq_prt_token UNIQUE (token_hash),
     CONSTRAINT fk_prt_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     INDEX idx_prt_user (user_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    jti             VARCHAR(64) NOT NULL,
+    expires_at      DATETIME NOT NULL,
+    revoked_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_revoked_tokens_jti UNIQUE (jti),
+    INDEX idx_revoked_tokens_jti (jti)
 ) ENGINE=InnoDB;
 
 INSERT INTO users (id, email, username, password_hash, full_name, avatar_url, system_role, is_active, last_login_at, created_at) VALUES

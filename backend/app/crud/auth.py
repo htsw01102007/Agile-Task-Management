@@ -1,3 +1,5 @@
+from __future__ import annotations
+import uuid
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -29,6 +31,12 @@ from app.core.security import (
     hash_reset_token,
 )
 from app.core.config import settings
+from app.core.ws_manager import disconnect_all_for_user_sync
+
+
+def _utc_now_naive() -> datetime:
+    """Trả về thời gian UTC hiện tại dạng naive để lưu đồng nhất vào cột DATETIME của MySQL."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def to_user_out(user: User) -> UserOut:
@@ -53,15 +61,18 @@ def ensure_active(user: User) -> None:
 
 
 def issue_tokens(db: Session, user: User) -> TokenResponse:
-    user.last_login_at = datetime.now()
+    user.last_login_at = _utc_now_naive()
     db.commit()
     db.refresh(user)
 
+    session_id = str(uuid.uuid4())
     token_data = {
         "sub": user.email,
         "user_id": user.id,
         "role": user.system_role,
         "username": user.username,
+        "sid": session_id,
+        "token_version": user.token_version or 0,
     }
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
@@ -91,6 +102,7 @@ def register_user(db: Session, data: RegisterRequest) -> UserOut:
         full_name=data.full_name,
         system_role="user",
         is_active=True,
+        token_version=0,
     )
     db.add(new_user)
     db.commit()
@@ -105,7 +117,7 @@ def authenticate_user(db: Session, data: LoginRequest) -> TokenResponse:
     user = (
         db.query(User)
         .filter(
-            (func.lower(User.email) == identifier_lower) | 
+            (func.lower(User.email) == identifier_lower) |
             (func.lower(User.username) == identifier_lower)
         )
         .first()
@@ -132,6 +144,13 @@ def refresh_user_token(db: Session, refresh_token_str: str) -> TokenResponse:
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
+    token_id = get_token_identifier(refresh_token_str, payload)
+    check_ids = [token_id]
+    if payload.get("sid"):
+        check_ids.append(str(payload["sid"]))
+    if db.query(RevokedToken.id).filter(RevokedToken.jti.in_(check_ids)).first() is not None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token đã bị thu hồi")
+
     user_id = payload.get("user_id")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token không hợp lệ")
@@ -140,7 +159,19 @@ def refresh_user_token(db: Session, refresh_token_str: str) -> TokenResponse:
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Người dùng không tồn tại")
 
+    if payload.get("token_version", 0) != (user.token_version or 0):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Phiên đăng nhập đã hết hiệu lực")
+
     ensure_active(user)
+
+    # Thu hồi refresh token cũ (rotation) trước khi cấp cặp mới
+    now = datetime.now(timezone.utc)
+    exp_ts = payload.get("exp")
+    expires_at = datetime.fromtimestamp(exp_ts, tz=timezone.utc) if exp_ts else now
+    if db.query(RevokedToken.id).filter(RevokedToken.jti == token_id).first() is None:
+        db.add(RevokedToken(jti=token_id, expires_at=expires_at))
+        db.flush()
+
     return issue_tokens(db, user)
 
 
@@ -155,12 +186,13 @@ def create_password_reset_token(db: Session, email: str) -> ForgotPasswordRespon
 
     raw_token = generate_reset_token()
     token_hash = hash_reset_token(raw_token)
-    expires_at = datetime.now() + timedelta(minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES)
+    now_naive = _utc_now_naive()
+    expires_at = now_naive + timedelta(minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES)
 
     db.query(PasswordResetToken).filter(
         PasswordResetToken.user_id == user.id,
         PasswordResetToken.used_at.is_(None)
-    ).update({"used_at": datetime.now()})
+    ).update({"used_at": now_naive})
 
     reset_record = PasswordResetToken(
         user_id=user.id,
@@ -188,7 +220,11 @@ def reset_user_password(db: Session, token_str: str, new_password: str) -> Messa
             detail="Mã đặt lại mật khẩu không hợp lệ hoặc đã được sử dụng"
         )
 
-    if record.expires_at < datetime.now():
+    now_naive = _utc_now_naive()
+    exp_dt = record.expires_at
+    if exp_dt.tzinfo is not None:
+        exp_dt = exp_dt.astimezone(timezone.utc).replace(tzinfo=None)
+    if exp_dt < now_naive:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Mã đặt lại mật khẩu đã hết hạn"
@@ -199,9 +235,11 @@ def reset_user_password(db: Session, token_str: str, new_password: str) -> Messa
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tài khoản không hợp lệ hoặc đã bị khóa")
 
     user.password_hash = hash_password(new_password)
-    record.used_at = datetime.now()
+    user.token_version = (user.token_version or 0) + 1
+    record.used_at = now_naive
     db.commit()
 
+    disconnect_all_for_user_sync(user.id, reason="Mật khẩu đã được đặt lại")
     return MessageResponse(message="Đặt lại mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới.")
 
 
@@ -230,7 +268,10 @@ def change_user_password(db: Session, current_user: User, data: ChangePasswordRe
         )
 
     current_user.password_hash = hash_password(data.new_password)
+    current_user.token_version = (current_user.token_version or 0) + 1
     db.commit()
+
+    disconnect_all_for_user_sync(current_user.id, reason="Mật khẩu đã thay đổi")
     return MessageResponse(message="Đổi mật khẩu thành công")
 
 
@@ -291,6 +332,7 @@ def authenticate_google_user(
                 avatar_url=avatar_url,
                 system_role="user",
                 is_active=True,
+                token_version=0,
             )
             db.add(user)
             db.commit()
@@ -325,16 +367,52 @@ def authenticate_google_user(
     return issue_tokens(db, user)
 
 
-
-def logout_user(db: Session, token: str) -> MessageResponse:
+def logout_user(
+    db: Session,
+    token: str,
+    refresh_token_str: str | None = None,
+    user_id: int | None = None,
+) -> MessageResponse:
     payload = decode_access_token(token)
     token_id = get_token_identifier(token, payload)
     now = datetime.now(timezone.utc)
     exp_ts = payload.get("exp")
     expires_at = datetime.fromtimestamp(exp_ts, tz=timezone.utc) if exp_ts else now
+    refresh_exp = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     db.query(RevokedToken).filter(RevokedToken.expires_at < now).delete(synchronize_session=False)
-    if db.query(RevokedToken.id).filter(RevokedToken.jti == token_id).first() is None:
-        db.add(RevokedToken(jti=token_id, expires_at=expires_at))
+
+    uid = user_id or payload.get("user_id")
+    ids_to_revoke = [(token_id, expires_at)]
+    if payload.get("sid"):
+        ids_to_revoke.append((str(payload["sid"]), refresh_exp))
+
+    if refresh_token_str:
+        try:
+            ref_payload = decode_refresh_token(refresh_token_str)
+            ref_uid = ref_payload.get("user_id")
+            if uid is not None and ref_uid != int(uid):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Refresh token không thuộc về người dùng hiện tại",
+                )
+            if not (payload.get("sid") and ref_payload.get("sid") and ref_payload.get("sid") != payload.get("sid")):
+                ref_id = get_token_identifier(refresh_token_str, ref_payload)
+                ref_exp_ts = ref_payload.get("exp")
+                ref_exp = datetime.fromtimestamp(ref_exp_ts, tz=timezone.utc) if ref_exp_ts else refresh_exp
+                ids_to_revoke.append((ref_id, ref_exp))
+        except ValueError:
+            pass
+
+    seen = set()
+    for jti_val, exp_val in ids_to_revoke:
+        if jti_val in seen:
+            continue
+        seen.add(jti_val)
+        if db.query(RevokedToken.id).filter(RevokedToken.jti == jti_val).first() is None:
+            db.add(RevokedToken(jti=jti_val, expires_at=exp_val))
+
     db.commit()
+    if uid is not None:
+        disconnect_all_for_user_sync(int(uid), reason="Đã đăng xuất")
     return MessageResponse(message="Đăng xuất thành công")

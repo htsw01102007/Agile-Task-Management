@@ -1,9 +1,11 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
 from app.db.session import get_db
 from app.core.permissions import get_project_and_membership, require_project_roles
+from app.core.ws_manager import disconnect_project_user_sync
 from app.models.project_member import ProjectMember
 from app.models.project import Project
 from app.models.task import Task, TaskAssignee
@@ -92,8 +94,8 @@ def update_member_role(
         entity_type="member",
         entity_id=user_id,
         action="role_changed",
-        old_value=f'{{"role": "{old_role}"}}',
-        new_value=f'{{"role": "{role_update.role}"}}',
+        old_value=json.dumps({"role": old_role}),
+        new_value=json.dumps({"role": role_update.role}),
     ))
 
     db.commit()
@@ -169,11 +171,12 @@ def remove_member(
         entity_type="member",
         entity_id=user_id,
         action="removed",
-        old_value=f'{{"user_id": {user_id}, "role": "{member.role}"}}',
+        old_value=json.dumps({"user_id": user_id, "role": member.role}),
         new_value=None,
     ))
 
     db.commit()
+    disconnect_project_user_sync(project_id, user_id, reason="Bạn đã bị xoá khỏi dự án")
     return None
 
 
@@ -199,8 +202,9 @@ def leave_project(
         entity_type="member",
         entity_id=member.user_id,
         action="left",
-        old_value=f'{{"user_id": {member.user_id}, "role": "{member.role}"}}',
+        old_value=json.dumps({"user_id": member.user_id, "role": member.role}),
         new_value=None,
     ))
     db.commit()
+    disconnect_project_user_sync(project_id, member.user_id, reason="Bạn đã rời dự án")
     return None

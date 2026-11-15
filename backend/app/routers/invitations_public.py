@@ -1,8 +1,9 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.db.session import get_db
 from app.core.deps import get_current_user
@@ -24,7 +25,7 @@ def list_my_invitations(
     current_user: User = Depends(get_current_user),
 ):
     """Danh sách các lời mời tham gia dự án gửi tới email của người dùng hiện tại"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     invitations = (
         db.query(ProjectInvitation)
         .join(Project, Project.id == ProjectInvitation.project_id)
@@ -56,7 +57,7 @@ def accept_invitation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lời mời không tồn tại")
     if invitation.status != "pending":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời không còn hiệu lực")
-    if invitation.expires_at < datetime.utcnow():
+    if invitation.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         invitation.status = "expired"
         db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời đã hết hạn")
@@ -64,6 +65,11 @@ def accept_invitation(
     project = get_active_project_by_id(db, invitation.project_id)
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dự án không tồn tại hoặc đã bị xoá")
+    if project.status in ("completed", "archived"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Dự án đang ở trạng thái '{project.status}' (chỉ đọc), không thể chấp nhận lời mời lúc này",
+        )
 
     if invitation.invitee_email.lower() != current_user.email.lower():
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Lời mời này không dành cho bạn")
@@ -85,7 +91,7 @@ def accept_invitation(
 
     invitation.status = "accepted"
     invitation.invitee_id = current_user.id
-    invitation.responded_at = datetime.utcnow()
+    invitation.responded_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     if invitation.inviter_id is not None:
         db.add(
@@ -106,7 +112,7 @@ def accept_invitation(
             entity_type="member",
             entity_id=current_user.id,
             action="joined",
-            new_value=f'{{"user_id": {current_user.id}, "role": "{invitation.role}"}}',
+            new_value=json.dumps({"user_id": current_user.id, "role": invitation.role}, ensure_ascii=False),
         )
     )
 
@@ -125,7 +131,7 @@ def decline_invitation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lời mời không tồn tại")
     if invitation.status != "pending":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời không còn hiệu lực")
-    if invitation.expires_at < datetime.utcnow():
+    if invitation.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         invitation.status = "expired"
         db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời đã hết hạn")
@@ -136,7 +142,7 @@ def decline_invitation(
 
     invitation.status = "declined"
     invitation.invitee_id = current_user.id
-    invitation.responded_at = datetime.utcnow()
+    invitation.responded_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     if invitation.inviter_id is not None:
         db.add(

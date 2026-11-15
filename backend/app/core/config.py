@@ -1,5 +1,18 @@
+from pathlib import Path
 from urllib.parse import quote_plus
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+_INSECURE_DEFAULT_SECRETS = {
+    "",
+    "super-secret-key",
+    "changeme",
+    "37da485fb46bad455e73ea0f2e2594ceedb41fb57dc221bfc4314288de3a22e4",
+}
+_INSECURE_DEFAULT_DB_PASSWORDS = {
+    "",
+    "Minh01052007.",
+}
 
 
 class Settings(BaseSettings):
@@ -34,6 +47,7 @@ class Settings(BaseSettings):
     # Frontend / CORS
     FRONTEND_URL: str = "http://localhost:5173"
     CORS_ORIGINS: str = "*"
+    UPLOAD_DIR: str = str(Path(__file__).resolve().parents[2] / "uploads")
 
     @property
     def database_url(self) -> str:
@@ -51,6 +65,26 @@ class Settings(BaseSettings):
         if self.FRONTEND_URL not in origins and self.FRONTEND_URL:
             origins.append(self.FRONTEND_URL)
         return origins
+
+    @property
+    def cors_allow_credentials(self) -> bool:
+        return self.cors_origin_list != ["*"]
+
+    def validate_production_settings(self) -> None:
+        """Chặn khởi động ở môi trường production nếu còn cấu hình mặc định không an toàn."""
+        if self.ENV.strip().lower() != "production":
+            return
+
+        errors: list[str] = []
+        if self.SECRET_KEY.strip() in _INSECURE_DEFAULT_SECRETS or len(self.SECRET_KEY.strip()) < 32:
+            errors.append("SECRET_KEY phải được cấu hình riêng (>= 32 ký tự) ở môi trường production")
+        if self.DB_PASSWORD in _INSECURE_DEFAULT_DB_PASSWORDS:
+            errors.append("DB_PASSWORD không được để trống hoặc dùng mật khẩu mặc định ở môi trường production")
+        if self.CORS_ORIGINS.strip() == "*" or "*" in self.cors_origin_list:
+            errors.append("CORS_ORIGINS không được dùng '*' ở môi trường production")
+
+        if errors:
+            raise RuntimeError("Cấu hình production không an toàn: " + "; ".join(errors))
 
 
 settings = Settings()

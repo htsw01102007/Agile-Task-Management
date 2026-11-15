@@ -11,6 +11,12 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-Minh01052007.}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     networks:
       - app_network
 
@@ -19,14 +25,17 @@ services:
     container_name: task_management_backend
     restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
+      ENV: ${ENV:-development}
       DB_HOST: db
       DB_PORT: 3306
       DB_USER: root
       DB_PASSWORD: ${DB_PASSWORD:-Minh01052007.}
       DB_NAME: ${DB_NAME:-task_project_management}
       SECRET_KEY: ${SECRET_KEY:-super-secret-key}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
     ports:
       - "8000:8000"
     networks:

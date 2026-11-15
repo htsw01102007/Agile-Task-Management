@@ -1,6 +1,7 @@
+import json
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, Query
@@ -125,8 +126,8 @@ def transfer_project_ownership(
                 entity_type="project",
                 entity_id=project.id,
                 action="ownership_transferred",
-                old_value=f'{{"owner_id": {old_owner_id}}}',
-                new_value=f'{{"owner_id": {new_owner_id}}}',
+                old_value=json.dumps({"owner_id": old_owner_id}),
+                new_value=json.dumps({"owner_id": new_owner_id}),
             )
         )
         db.commit()
@@ -191,7 +192,7 @@ def create_project_invitation(
             )
 
     # 2. Chống mời trùng: Kiểm tra trong service xem đã có lời mời pending cho email này chưa
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     pending_invitations = (
         db.query(ProjectInvitation)
         .filter(
@@ -247,7 +248,7 @@ def create_project_invitation(
             entity_type="invitation",
             entity_id=invitation.id,
             action="created",
-            new_value=f'{{"invitee_email": "{normalized_email}", "role": "{invitation_in.role}"}}',
+            new_value=json.dumps({"invitee_email": normalized_email, "role": invitation_in.role}, ensure_ascii=False),
         )
     )
 

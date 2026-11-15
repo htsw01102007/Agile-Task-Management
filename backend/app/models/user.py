@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, String, Boolean, DateTime, Enum, func
+from sqlalchemy import Column, BigInteger, Integer, String, Boolean, DateTime, Enum, func
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 
@@ -14,6 +14,7 @@ class User(Base):
     avatar_url = Column(String(500), nullable=True)
     system_role = Column(Enum("admin", "user"), nullable=False, default="user")
     is_active = Column(Boolean, nullable=False, default=True)
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
     last_login_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())

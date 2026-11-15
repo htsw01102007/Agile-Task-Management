@@ -39,7 +39,11 @@ def create_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return create_project_with_owner(db=db, project_in=project_in, owner_id=current_user.id)
+    project = create_project_with_owner(db=db, project_in=project_in, owner_id=current_user.id)
+    response = ProjectResponse.model_validate(project)
+    response.my_role = "owner"
+    response.user_role = "owner"
+    return response
 
 
 @router.get("", response_model=List[ProjectResponse])
@@ -51,19 +55,26 @@ def list_my_projects(
     limit: int = Query(100, ge=1, le=1000),
     status: Optional[str] = Query(None, pattern="^(active|completed|archived)$"),
 ):
-    """Danh sách dự án mà người dùng hiện tại là thành viên (chưa bị xoá mềm), có phân trang và lọc trạng thái"""
+    """Danh sách dự án mà người dùng hiện tại là thành viên (chưa bị xoá mềm), có phân trang, lọc trạng thái và vai trò của tôi trong mỗi dự án"""
     query = (
         query_active_projects(db)
         .join(ProjectMember, ProjectMember.project_id == Project.id)
         .filter(ProjectMember.user_id == current_user.id)
+        .add_columns(ProjectMember.role)
     )
     if status:
         query = query.filter(Project.status == status)
 
     total = query.count()
-    projects = query.order_by(Project.created_at.desc(), Project.id.desc()).offset(skip).limit(limit).all()
+    rows = query.order_by(Project.created_at.desc(), Project.id.desc()).offset(skip).limit(limit).all()
     response.headers["X-Total-Count"] = str(total)
-    return projects
+    results = []
+    for project, role in rows:
+        item = ProjectResponse.model_validate(project)
+        item.my_role = role
+        item.user_role = role
+        results.append(item)
+    return results
 
 
 @router.get("/{project_id}", response_model=ProjectDetailResponse)
@@ -75,6 +86,7 @@ def get_project_detail(
     project, member = data
     response = ProjectDetailResponse.model_validate(project)
     response.member_count = db.query(ProjectMember).filter(ProjectMember.project_id == project_id).count()
+    response.my_role = member.role
     response.user_role = member.role
 
     active_tasks_query = db.query(Task).filter(Task.project_id == project_id, Task.is_deleted.is_(False))
@@ -97,7 +109,7 @@ def update_project(
         require_project_roles("owner", "manager", allow_read_only_when_inactive=True)
     ),
 ):
-    project, _ = data
+    project, member = data
 
     update_data = project_update.model_dump(exclude_unset=True)
 
@@ -124,7 +136,10 @@ def update_project(
 
     db.commit()
     db.refresh(project)
-    return project
+    response = ProjectResponse.model_validate(project)
+    response.my_role = member.role
+    response.user_role = member.role
+    return response
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -176,9 +191,6 @@ def create_list(
     )
 
     is_done = bool(list_in.is_done_column)
-    if not existing_lists:
-        # Nếu dự án chưa có cột nào, cột đầu tiên mặc định cần đảm bảo có cột hoàn thành
-        is_done = bool(list_in.is_done_column)
 
     if is_done:
         # Đảm bảo mỗi dự án chỉ có đúng 1 cột hoàn thành

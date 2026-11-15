@@ -1,3 +1,4 @@
+from __future__ import annotations
 import hashlib
 import secrets
 import uuid
@@ -45,6 +46,7 @@ def create_refresh_token(data: dict, expires_days: int | None = None) -> str:
     days = expires_days or settings.REFRESH_TOKEN_EXPIRE_DAYS
     payload["type"] = REFRESH_TOKEN_TYPE
     payload["exp"] = datetime.now(timezone.utc) + timedelta(days=days)
+    payload.setdefault("jti", str(uuid.uuid4()))
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
