@@ -174,13 +174,14 @@ CREATE TABLE task_labels (
 ) ENGINE=InnoDB;
 
 CREATE TABLE checklist_items (
-    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    task_id         BIGINT UNSIGNED NOT NULL,
-    content         VARCHAR(500) NOT NULL,
-    is_done         BOOLEAN NOT NULL DEFAULT FALSE,
-    position        INT UNSIGNED NOT NULL DEFAULT 0,
-    completed_at    DATETIME NULL,
-    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id                BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    task_id           BIGINT UNSIGNED NOT NULL,
+    content           VARCHAR(500) NOT NULL,
+    is_done           BOOLEAN NOT NULL DEFAULT FALSE,
+    position          INT UNSIGNED NOT NULL DEFAULT 0,
+    completed_at      DATETIME NULL,
+    created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, -- Thêm dòng này vào
     CONSTRAINT fk_ci_task FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE,
     INDEX idx_ci_task_position (task_id, position)
 ) ENGINE=InnoDB;
