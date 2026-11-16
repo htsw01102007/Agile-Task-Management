@@ -28,6 +28,18 @@ def test_project_crud_my_role_and_member_permissions(client, test_user_factory):
     assert detail_m.status_code == 200
     assert detail_m.json()["my_role"] == "member"
 
+    # List trả về member_count/task_count khớp endpoint detail
+    lists = client.get(f"/api/projects/{project_id}/lists", headers=owner["headers"]).json()
+    assert client.post(
+        f"/api/projects/{project_id}/tasks",
+        headers=owner["headers"],
+        json={"title": "Counted task", "list_id": lists[0]["id"]},
+    ).status_code == 201
+    list_o = client.get("/api/projects", headers=owner["headers"]).json()
+    mine = next(p for p in list_o if p["id"] == project_id)
+    assert mine["member_count"] == 3  # owner + member + viewer
+    assert mine["task_count"] == 1
+
     # Member cannot update project or add members
     assert client.put(
         f"/api/projects/{project_id}",

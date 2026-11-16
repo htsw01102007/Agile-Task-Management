@@ -68,11 +68,32 @@ def list_my_projects(
     total = query.count()
     rows = query.order_by(Project.created_at.desc(), Project.id.desc()).offset(skip).limit(limit).all()
     response.headers["X-Total-Count"] = str(total)
+
+    project_ids = [p.id for p, _ in rows]
+    member_counts = {}
+    task_counts = {}
+    if project_ids:
+        member_counts = dict(
+            db.query(ProjectMember.project_id, func.count())
+            .filter(ProjectMember.project_id.in_(project_ids))
+            .group_by(ProjectMember.project_id)
+            .all()
+        )
+        # Đếm task khớp quy ước endpoint detail: chỉ tính task chưa bị xoá mềm
+        task_counts = dict(
+            db.query(Task.project_id, func.count())
+            .filter(Task.project_id.in_(project_ids), Task.is_deleted.is_(False))
+            .group_by(Task.project_id)
+            .all()
+        )
+
     results = []
     for project, role in rows:
         item = ProjectResponse.model_validate(project)
         item.my_role = role
         item.user_role = role
+        item.member_count = member_counts.get(project.id, 0)
+        item.task_count = task_counts.get(project.id, 0)
         results.append(item)
     return results
 

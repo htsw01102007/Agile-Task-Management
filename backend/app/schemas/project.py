@@ -37,12 +37,12 @@ class ProjectResponse(BaseModel):
     deleted_at: Optional[datetime] = None
     my_role: Optional[str] = None  # vai trò của tôi trong dự án (owner/manager/member/viewer)
     user_role: Optional[str] = None
+    member_count: int = 0
+    task_count: int = 0
 
 
 class ProjectDetailResponse(ProjectResponse):
     model_config = ConfigDict(from_attributes=True)
 
-    member_count: int = 0
-    task_count: int = 0
     completed_task_count: int = 0
     completion_rate: float = 0.0
