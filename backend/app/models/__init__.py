@@ -6,7 +6,8 @@ from app.models.project_invitation import ProjectInvitation
 from app.models.password_reset_token import PasswordResetToken
 from app.models.list import ListModel
 from app.models.label import Label
-from app.models.task import Task, TaskAssignee, TaskLabel
+from app.models.task import Task, TaskAssignee
+from app.models.task_label import TaskLabel
 from app.models.checklist import ChecklistItem
 from app.models.comment import Comment
 from app.models.attachment import Attachment
@@ -31,4 +32,3 @@ __all__ = [
     "Notification",
     "ActivityLog",
 ]
-

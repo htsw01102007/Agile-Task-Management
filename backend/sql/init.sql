@@ -1,14 +1,16 @@
-CREATE DATABASE IF NOT EXISTS task_project_management
+SET NAMES utf8mb4;
+
+CREATE DATABASE IF NOT EXISTS agile_task_management
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_unicode_ci;
 
-USE task_project_management;
+USE agile_task_management;
 
 CREATE TABLE users (
     id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     email           VARCHAR(255) NOT NULL,
     username        VARCHAR(50)  NOT NULL,
-    password_hash   VARCHAR(255) NOT NULL,
+    password_hash   VARCHAR(255) NULL,
     full_name       VARCHAR(150) NOT NULL,
     avatar_url      VARCHAR(500) NULL,
     system_role     ENUM('admin', 'user') NOT NULL DEFAULT 'user',
@@ -18,6 +20,21 @@ CREATE TABLE users (
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT uq_users_email UNIQUE (email),
     CONSTRAINT uq_users_username UNIQUE (username)
+) ENGINE=InnoDB;
+
+CREATE TABLE oauth_accounts (
+    id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id             BIGINT UNSIGNED NOT NULL,
+    provider            VARCHAR(50) NOT NULL,
+    provider_user_id    VARCHAR(255) NOT NULL,
+    access_token        TEXT NULL,
+    refresh_token       TEXT NULL,
+    token_expires_at    DATETIME NULL,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uq_oauth_provider_user UNIQUE (provider, provider_user_id),
+    CONSTRAINT fk_oauth_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    INDEX idx_oauth_user (user_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE projects (
@@ -51,7 +68,7 @@ CREATE TABLE project_members (
 CREATE TABLE project_invitations (
     id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     project_id      BIGINT UNSIGNED NOT NULL,
-    inviter_id      BIGINT UNSIGNED NOT NULL,
+    inviter_id      BIGINT UNSIGNED NULL,
     invitee_email   VARCHAR(255) NOT NULL,
     invitee_id      BIGINT UNSIGNED NULL,
     role            ENUM('manager', 'member', 'viewer') NOT NULL DEFAULT 'member',
@@ -62,7 +79,7 @@ CREATE TABLE project_invitations (
     responded_at    DATETIME NULL,
     CONSTRAINT uq_invitations_token UNIQUE (token),
     CONSTRAINT fk_inv_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
-    CONSTRAINT fk_inv_inviter FOREIGN KEY (inviter_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_inv_inviter FOREIGN KEY (inviter_id) REFERENCES users (id) ON DELETE SET NULL,
     CONSTRAINT fk_inv_invitee FOREIGN KEY (invitee_id) REFERENCES users (id) ON DELETE SET NULL,
     INDEX idx_inv_project_status (project_id, status),
     INDEX idx_inv_email (invitee_email)
@@ -85,7 +102,7 @@ CREATE TABLE tasks (
     id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     project_id      BIGINT UNSIGNED NOT NULL,
     list_id         BIGINT UNSIGNED NOT NULL,
-    title           VARCHAR(255) NOT NULL,
+    title           VARCHAR(500) NOT NULL,
     description     TEXT NULL,
     position        INT UNSIGNED NOT NULL DEFAULT 0,
     priority        ENUM('low', 'medium', 'high', 'urgent') NOT NULL DEFAULT 'medium',
@@ -93,6 +110,7 @@ CREATE TABLE tasks (
     due_date        DATETIME NULL,
     completed_at    DATETIME NULL,
     created_by      BIGINT UNSIGNED NULL,
+    is_deleted      BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at      DATETIME NULL,
@@ -103,6 +121,7 @@ CREATE TABLE tasks (
     INDEX idx_tasks_list_position (list_id, position),
     INDEX idx_tasks_project_due (project_id, due_date),
     INDEX idx_tasks_project_priority (project_id, priority),
+    INDEX idx_tasks_is_deleted (is_deleted),
     INDEX idx_tasks_deleted (deleted_at),
     FULLTEXT INDEX ftx_tasks_title_desc (title, description)
 ) ENGINE=InnoDB;
@@ -140,11 +159,11 @@ CREATE TABLE activity_logs (
     project_id      BIGINT UNSIGNED NOT NULL,
     task_id         BIGINT UNSIGNED NULL,
     user_id         BIGINT UNSIGNED NULL,
-    entity_type     ENUM('project', 'member', 'invitation', 'list', 'task', 'comment', 'label', 'checklist_item', 'attachment') NOT NULL,
-    entity_id       BIGINT UNSIGNED NOT NULL,
+    entity_type     VARCHAR(50) NOT NULL,
+    entity_id       BIGINT UNSIGNED NULL,
     action          VARCHAR(50) NOT NULL,
-    old_value       JSON NULL,
-    new_value       JSON NULL,
+    old_value       TEXT NULL,
+    new_value       TEXT NULL,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_al_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
     CONSTRAINT fk_al_task FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE SET NULL,
@@ -181,6 +200,7 @@ CREATE TABLE checklist_items (
     position        INT UNSIGNED NOT NULL DEFAULT 0,
     completed_at    DATETIME NULL,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_ci_task FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE,
     INDEX idx_ci_task_position (task_id, position)
 ) ENGINE=InnoDB;
@@ -189,15 +209,15 @@ CREATE TABLE attachments (
     id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     task_id         BIGINT UNSIGNED NOT NULL,
     comment_id      BIGINT UNSIGNED NULL,
-    uploaded_by     BIGINT UNSIGNED NULL,
+    user_id         BIGINT UNSIGNED NOT NULL,
     file_name       VARCHAR(255) NOT NULL,
     file_path       VARCHAR(500) NOT NULL,
     file_size       BIGINT UNSIGNED NOT NULL,
-    mime_type       VARCHAR(100) NOT NULL,
+    mime_type       VARCHAR(100) NULL,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_att_task FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE,
     CONSTRAINT fk_att_comment FOREIGN KEY (comment_id) REFERENCES comments (id) ON DELETE SET NULL,
-    CONSTRAINT fk_att_user FOREIGN KEY (uploaded_by) REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT fk_att_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     INDEX idx_att_task (task_id)
 ) ENGINE=InnoDB;
 
@@ -207,8 +227,34 @@ CREATE TABLE notifications (
     actor_id        BIGINT UNSIGNED NULL,
     project_id      BIGINT UNSIGNED NULL,
     task_id         BIGINT UNSIGNED NULL,
-    type            ENUM('task_assigned', 'task_due_soon', 'task_overdue', 'comment_added', 'mentioned', 'project_invited', 'member_joined', 'task_completed') NOT NULL,
-    message         VARCHAR(500) NOT NULL,
+    type            ENUM(
+        'task_created',
+        'task_assigned',
+        'task_updated',
+        'task_moved',
+        'task_completed',
+        'task_deleted',
+        'task_overdue',
+        'task_due_soon',
+        'comment_added',
+        'comment_updated',
+        'comment_deleted',
+        'mentioned',
+        'project_invited',
+        'member_joined',
+        'invitation_sent',
+        'invitation_accepted',
+        'invitation_declined',
+        'member_added',
+        'member_removed',
+        'member_role_changed',
+        'project_updated',
+        'deadline_reminder'
+    ) NOT NULL,
+    title           VARCHAR(255) NOT NULL DEFAULT 'Thông báo hệ thống',
+    message         TEXT NULL,
+    entity_type     VARCHAR(50) NULL,
+    entity_id       BIGINT UNSIGNED NULL,
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,
     read_at         DATETIME NULL,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -277,28 +323,28 @@ INSERT INTO lists (id, project_id, name, position, is_done_column, created_at) V
 (10, 3, 'Đang làm',    2, FALSE, '2026-07-01 09:00:00'),
 (11, 3, 'Hoàn thành',  3, TRUE,  '2026-07-01 09:00:00');
  
-INSERT INTO tasks (id, project_id, list_id, title, description, position, priority, start_date, due_date, completed_at, created_by, created_at, deleted_at) VALUES
-(1,  1, 5,  'Thiết kế cơ sở dữ liệu',                     'Thiết kế ERD, chuẩn hóa đến 3NF và viết script tạo bảng MySQL.',                          1, 'high',   '2026-09-02 08:00:00', '2026-09-10 17:00:00', '2026-09-09 10:30:00', 2, '2026-09-02 08:00:00', NULL),
-(2,  1, 5,  'Thiết kế giao diện trang chủ',               'Hoàn thiện mockup trang chủ, trang danh mục và trang chi tiết sản phẩm.',                  2, 'medium', '2026-09-05 08:00:00', '2026-09-20 17:00:00', '2026-09-18 16:00:00', 3, '2026-09-05 08:30:00', NULL),
-(3,  1, 5,  'Xây dựng API xác thực JWT',                  'Đăng ký, đăng nhập, làm mới token và phân quyền theo vai trò.',                            3, 'high',   '2026-09-10 08:00:00', '2026-09-25 17:00:00', '2026-09-24 15:20:00', 3, '2026-09-10 08:30:00', NULL),
-(4,  1, 4,  'Xây dựng API sản phẩm và danh mục',          'CRUD sản phẩm, danh mục, phân trang và lọc theo giá, danh mục.',                           1, 'high',   '2026-10-01 08:00:00', '2026-10-20 17:00:00', NULL,                  3, '2026-10-01 08:30:00', NULL),
-(5,  1, 3,  'Tích hợp cổng thanh toán VNPay',             'Tạo URL thanh toán, xử lý callback IPN và đối soát giao dịch.',                            1, 'urgent', '2026-10-15 08:00:00', '2026-11-10 17:00:00', NULL,                  2, '2026-10-15 08:30:00', NULL),
-(6,  1, 3,  'Xây dựng chức năng giỏ hàng',                'Thêm, sửa, xóa sản phẩm trong giỏ và tính tổng tiền kèm khuyến mãi.',                      2, 'high',   '2026-10-20 08:00:00', '2026-11-12 17:00:00', NULL,                  3, '2026-10-20 09:00:00', NULL),
-(7,  1, 2,  'Viết unit test cho module đơn hàng',         'Bao phủ tối thiểu 80% các service tạo đơn, hủy đơn và cập nhật trạng thái.',               1, 'medium', '2026-11-05 08:00:00', '2026-11-20 17:00:00', NULL,                  3, '2026-10-28 10:00:00', NULL),
-(8,  1, 2,  'Tối ưu truy vấn danh sách sản phẩm',         'Phân tích EXPLAIN, bổ sung chỉ mục và giảm số truy vấn N+1.',                              2, 'medium', '2026-11-08 08:00:00', '2026-11-18 17:00:00', NULL,                  2, '2026-10-30 14:00:00', NULL),
-(9,  1, 1,  'Tích hợp gửi email thông báo đơn hàng',      'Gửi email xác nhận đơn, giao hàng thành công qua hàng đợi nền.',                           1, 'low',    NULL,                  NULL,                  NULL,                  2, '2026-10-05 11:00:00', NULL),
-(10, 1, 1,  'Triển khai lên máy chủ staging',             'Dockerize ứng dụng, cấu hình Nginx, HTTPS và biến môi trường.',                            2, 'high',   '2026-11-25 08:00:00', '2026-12-05 17:00:00', NULL,                  2, '2026-10-12 09:00:00', NULL),
-(11, 1, 1,  'Nghiên cứu chatbot hỗ trợ khách hàng',       'Đánh giá khả năng tích hợp chatbot tư vấn sản phẩm.',                                      3, 'low',    NULL,                  NULL,                  NULL,                  2, '2026-10-06 09:00:00', '2026-10-25 16:00:00'),
-(12, 2, 8,  'Phác thảo wireframe màn hình chính',         'Wireframe màn hình tổng quan, thêm giao dịch và thống kê.',                                1, 'medium', '2026-10-02 08:00:00', '2026-10-12 17:00:00', '2026-10-11 14:00:00', 3, '2026-10-02 08:30:00', NULL),
-(13, 2, 8,  'Thiết lập dự án Flutter và CI/CD',           'Khởi tạo cấu trúc dự án, lint và pipeline build tự động.',                                 2, 'high',   '2026-10-05 08:00:00', '2026-10-15 17:00:00', '2026-10-14 11:00:00', 3, '2026-10-05 08:30:00', NULL),
-(14, 2, 7,  'Màn hình thêm giao dịch',                    'Form nhập số tiền, danh mục, ngày và ghi chú cho giao dịch thu chi.',                      1, 'high',   '2026-10-20 08:00:00', '2026-11-08 17:00:00', NULL,                  3, '2026-10-20 09:00:00', NULL),
-(15, 2, 7,  'Đồng bộ dữ liệu offline',                    'Lưu cục bộ bằng SQLite và đồng bộ lên máy chủ khi có mạng.',                               2, 'urgent', '2026-10-28 08:00:00', '2026-11-15 17:00:00', NULL,                  2, '2026-10-28 09:00:00', NULL),
-(16, 2, 6,  'Biểu đồ thống kê chi tiêu theo tháng',       'Biểu đồ cột và tròn thể hiện chi tiêu theo danh mục từng tháng.',                          1, 'medium', '2026-11-10 08:00:00', '2026-11-30 17:00:00', NULL,                  3, '2026-10-25 10:00:00', NULL),
-(17, 2, 6,  'Xuất báo cáo PDF',                           'Cho phép xuất báo cáo thu chi theo khoảng thời gian ra tệp PDF.',                          2, 'low',    '2026-12-01 08:00:00', '2026-12-15 17:00:00', NULL,                  3, '2026-10-25 10:30:00', NULL),
-(18, 2, 6,  'Nhắc nhở khi vượt hạn mức ngân sách',        'Gửi thông báo đẩy khi tổng chi tiêu vượt hạn mức đã đặt.',                                 3, 'medium', NULL,                  NULL,                  NULL,                  5, '2026-10-26 15:00:00', NULL),
-(19, 3, 11, 'Lên kế hoạch nội dung truyền thông',         'Xây dựng lịch đăng bài, thông điệp chính và bộ nhận diện cho chiến dịch.',                 1, 'high',   '2026-07-01 08:00:00', '2026-07-15 17:00:00', '2026-07-14 16:30:00', 2, '2026-07-01 09:00:00', NULL),
-(20, 3, 11, 'Chạy quảng cáo Facebook Ads',                'Thiết lập chiến dịch, tối ưu đối tượng và theo dõi chuyển đổi hằng tuần.',                 2, 'high',   '2026-07-20 08:00:00', '2026-09-15 17:00:00', '2026-09-16 17:00:00', 2, '2026-07-18 09:00:00', NULL),
-(21, 3, 11, 'Tổng kết báo cáo chiến dịch',                'Tổng hợp chỉ số CPC, CTR, doanh thu và bài học kinh nghiệm.',                              3, 'medium', '2026-09-20 08:00:00', '2026-09-30 17:00:00', '2026-09-29 15:00:00', 5, '2026-09-18 10:00:00', NULL);
+INSERT INTO tasks (id, project_id, list_id, title, description, position, priority, start_date, due_date, completed_at, created_by, is_deleted, created_at, deleted_at) VALUES
+(1,  1, 5,  'Thiết kế cơ sở dữ liệu',                     'Thiết kế ERD, chuẩn hóa đến 3NF và viết script tạo bảng MySQL.',                          1, 'high',   '2026-09-02 08:00:00', '2026-09-10 17:00:00', '2026-09-09 10:30:00', 2, FALSE, '2026-09-02 08:00:00', NULL),
+(2,  1, 5,  'Thiết kế giao diện trang chủ',               'Hoàn thiện mockup trang chủ, trang danh mục và trang chi tiết sản phẩm.',                  2, 'medium', '2026-09-05 08:00:00', '2026-09-20 17:00:00', '2026-09-18 16:00:00', 3, FALSE, '2026-09-05 08:30:00', NULL),
+(3,  1, 5,  'Xây dựng API xác thực JWT',                  'Đăng ký, đăng nhập, làm mới token và phân quyền theo vai trò.',                            3, 'high',   '2026-09-10 08:00:00', '2026-09-25 17:00:00', '2026-09-24 15:20:00', 3, FALSE, '2026-09-10 08:30:00', NULL),
+(4,  1, 4,  'Xây dựng API sản phẩm và danh mục',          'CRUD sản phẩm, danh mục, phân trang và lọc theo giá, danh mục.',                           1, 'high',   '2026-10-01 08:00:00', '2026-10-20 17:00:00', NULL,                  3, FALSE, '2026-10-01 08:30:00', NULL),
+(5,  1, 3,  'Tích hợp cổng thanh toán VNPay',             'Tạo URL thanh toán, xử lý callback IPN và đối soát giao dịch.',                            1, 'urgent', '2026-10-15 08:00:00', '2026-11-10 17:00:00', NULL,                  2, FALSE, '2026-10-15 08:30:00', NULL),
+(6,  1, 3,  'Xây dựng chức năng giỏ hàng',                'Thêm, sửa, xóa sản phẩm trong giỏ và tính tổng tiền kèm khuyến mãi.',                      2, 'high',   '2026-10-20 08:00:00', '2026-11-12 17:00:00', NULL,                  3, FALSE, '2026-10-20 09:00:00', NULL),
+(7,  1, 2,  'Viết unit test cho module đơn hàng',         'Bao phủ tối thiểu 80% các service tạo đơn, hủy đơn và cập nhật trạng thái.',               1, 'medium', '2026-11-05 08:00:00', '2026-11-20 17:00:00', NULL,                  3, FALSE, '2026-10-28 10:00:00', NULL),
+(8,  1, 2,  'Tối ưu truy vấn danh sách sản phẩm',         'Phân tích EXPLAIN, bổ sung chỉ mục và giảm số truy vấn N+1.',                              2, 'medium', '2026-11-08 08:00:00', '2026-11-18 17:00:00', NULL,                  2, FALSE, '2026-10-30 14:00:00', NULL),
+(9,  1, 1,  'Tích hợp gửi email thông báo đơn hàng',      'Gửi email xác nhận đơn, giao hàng thành công qua hàng đợi nền.',                           1, 'low',    NULL,                  NULL,                  NULL,                  2, FALSE, '2026-10-05 11:00:00', NULL),
+(10, 1, 1,  'Triển khai lên máy chủ staging',             'Dockerize ứng dụng, cấu hình Nginx, HTTPS và biến môi trường.',                            2, 'high',   '2026-11-25 08:00:00', '2026-12-05 17:00:00', NULL,                  2, FALSE, '2026-10-12 09:00:00', NULL),
+(11, 1, 1,  'Nghiên cứu chatbot hỗ trợ khách hàng',       'Đánh giá khả năng tích hợp chatbot tư vấn sản phẩm.',                                      3, 'low',    NULL,                  NULL,                  NULL,                  2, TRUE,  '2026-10-06 09:00:00', '2026-10-25 16:00:00'),
+(12, 2, 8,  'Phác thảo wireframe màn hình chính',         'Wireframe màn hình tổng quan, thêm giao dịch và thống kê.',                                1, 'medium', '2026-10-02 08:00:00', '2026-10-12 17:00:00', '2026-10-11 14:00:00', 3, FALSE, '2026-10-02 08:30:00', NULL),
+(13, 2, 8,  'Thiết lập dự án Flutter và CI/CD',           'Khởi tạo cấu trúc dự án, lint và pipeline build tự động.',                                 2, 'high',   '2026-10-05 08:00:00', '2026-10-15 17:00:00', '2026-10-14 11:00:00', 3, FALSE, '2026-10-05 08:30:00', NULL),
+(14, 2, 7,  'Màn hình thêm giao dịch',                    'Form nhập số tiền, danh mục, ngày và ghi chú cho giao dịch thu chi.',                      1, 'high',   '2026-10-20 08:00:00', '2026-11-08 17:00:00', NULL,                  3, FALSE, '2026-10-20 09:00:00', NULL),
+(15, 2, 7,  'Đồng bộ dữ liệu offline',                    'Lưu cục bộ bằng SQLite và đồng bộ lên máy chủ khi có mạng.',                               2, 'urgent', '2026-10-28 08:00:00', '2026-11-15 17:00:00', NULL,                  2, FALSE, '2026-10-28 09:00:00', NULL),
+(16, 2, 6,  'Biểu đồ thống kê chi tiêu theo tháng',       'Biểu đồ cột và tròn thể hiện chi tiêu theo danh mục từng tháng.',                          1, 'medium', '2026-11-10 08:00:00', '2026-11-30 17:00:00', NULL,                  3, FALSE, '2026-10-25 10:00:00', NULL),
+(17, 2, 6,  'Xuất báo cáo PDF',                           'Cho phép xuất báo cáo thu chi theo khoảng thời gian ra tệp PDF.',                          2, 'low',    '2026-12-01 08:00:00', '2026-12-15 17:00:00', NULL,                  3, FALSE, '2026-10-25 10:30:00', NULL),
+(18, 2, 6,  'Nhắc nhở khi vượt hạn mức ngân sách',        'Gửi thông báo đẩy khi tổng chi tiêu vượt hạn mức đã đặt.',                                 3, 'medium', NULL,                  NULL,                  NULL,                  5, FALSE, '2026-10-26 15:00:00', NULL),
+(19, 3, 11, 'Lên kế hoạch nội dung truyền thông',         'Xây dựng lịch đăng bài, thông điệp chính và bộ nhận diện cho chiến dịch.',                 1, 'high',   '2026-07-01 08:00:00', '2026-07-15 17:00:00', '2026-07-14 16:30:00', 2, FALSE, '2026-07-01 09:00:00', NULL),
+(20, 3, 11, 'Chạy quảng cáo Facebook Ads',                'Thiết lập chiến dịch, tối ưu đối tượng và theo dõi chuyển đổi hằng tuần.',                 2, 'high',   '2026-07-20 08:00:00', '2026-09-15 17:00:00', '2026-09-16 17:00:00', 2, FALSE, '2026-07-18 09:00:00', NULL),
+(21, 3, 11, 'Tổng kết báo cáo chiến dịch',                'Tổng hợp chỉ số CPC, CTR, doanh thu và bài học kinh nghiệm.',                              3, 'medium', '2026-09-20 08:00:00', '2026-09-30 17:00:00', '2026-09-29 15:00:00', 5, FALSE, '2026-09-18 10:00:00', NULL);
  
 INSERT INTO task_assignees (task_id, user_id, assigned_by, assigned_at) VALUES
 (1,  3, 2, '2026-09-02 08:05:00'),
@@ -381,26 +427,26 @@ INSERT INTO checklist_items (task_id, content, is_done, position, completed_at, 
 (20, 'Thiết lập đối tượng mục tiêu',            TRUE,  2, '2026-07-22 15:00:00', '2026-07-18 09:30:00'),
 (20, 'Theo dõi chuyển đổi hằng tuần',           TRUE,  3, '2026-09-15 17:00:00', '2026-07-18 09:30:00');
  
-INSERT INTO attachments (id, task_id, comment_id, uploaded_by, file_name, file_path, file_size, mime_type, created_at) VALUES
+INSERT INTO attachments (id, task_id, comment_id, user_id, file_name, file_path, file_size, mime_type, created_at) VALUES
 (1, 1,  12,   4, 'erd_taskflow_v2.png',       '/uploads/projects/1/tasks/1/erd_taskflow_v2.png',       245760,  'image/png',                                                              '2026-09-09 10:00:00'),
 (2, 5,  NULL, 3, 'vnpay_sandbox_guide.pdf',   '/uploads/projects/1/tasks/5/vnpay_sandbox_guide.pdf',   1048576, 'application/pdf',                                                        '2026-10-16 09:10:00'),
 (3, 12, NULL, 5, 'wireframe_home.png',        '/uploads/projects/2/tasks/12/wireframe_home.png',       512000,  'image/png',                                                              '2026-10-11 13:50:00'),
 (4, 20, NULL, 2, 'bao_cao_chi_phi_ads.xlsx',  '/uploads/projects/3/tasks/20/bao_cao_chi_phi_ads.xlsx', 87040,   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '2026-09-16 17:20:00'),
 (5, 21, NULL, 5, 'bao_cao_tong_ket_q3.pdf',   '/uploads/projects/3/tasks/21/bao_cao_tong_ket_q3.pdf',  2097152, 'application/pdf',                                                        '2026-09-29 14:50:00');
  
-INSERT INTO notifications (id, user_id, actor_id, project_id, task_id, type, message, is_read, read_at, created_at) VALUES
-(1,  3, 2,    1, 5,    'task_assigned',   'Trần Quang Minh đã giao cho bạn công việc «Tích hợp cổng thanh toán VNPay».',        TRUE,  '2026-10-15 09:00:00', '2026-10-15 08:40:00'),
-(2,  4, 2,    1, 5,    'task_assigned',   'Trần Quang Minh đã giao cho bạn công việc «Tích hợp cổng thanh toán VNPay».',        TRUE,  '2026-10-15 10:00:00', '2026-10-15 08:40:00'),
-(3,  2, 3,    1, 5,    'comment_added',   'Phạm Thị Lan đã bình luận trong «Tích hợp cổng thanh toán VNPay».',                  FALSE, NULL,                  '2026-10-16 09:15:00'),
-(4,  3, 2,    1, 5,    'mentioned',       'Trần Quang Minh đã nhắc đến bạn trong «Tích hợp cổng thanh toán VNPay».',            TRUE,  '2026-10-16 10:00:00', '2026-10-16 09:40:00'),
-(5,  3, 4,    1, 4,    'comment_added',   'Lê Quốc Hùng đã bình luận trong «Xây dựng API sản phẩm và danh mục».',               FALSE, NULL,                  '2026-10-31 10:30:00'),
-(6,  5, 3,    1, 6,    'comment_added',   'Phạm Thị Lan đã trả lời bình luận của bạn trong «Xây dựng chức năng giỏ hàng».',     FALSE, NULL,                  '2026-10-22 13:30:00'),
-(7,  2, NULL, 2, 14,   'task_due_soon',   'Công việc «Màn hình thêm giao dịch» sẽ đến hạn vào 08/11/2026.',                     FALSE, NULL,                  '2026-11-04 08:00:00'),
-(8,  5, NULL, 2, 14,   'task_due_soon',   'Công việc «Màn hình thêm giao dịch» sẽ đến hạn vào 08/11/2026.',                     FALSE, NULL,                  '2026-11-04 08:00:00'),
-(9,  3, NULL, 1, 5,    'task_due_soon',   'Công việc «Tích hợp cổng thanh toán VNPay» sẽ đến hạn vào 10/11/2026.',              FALSE, NULL,                  '2026-11-04 08:00:00'),
-(10, 4, 3,    2, NULL, 'project_invited', 'Phạm Thị Lan đã mời bạn tham gia dự án «Ứng dụng Di động Quản lý Chi tiêu».',        TRUE,  '2026-10-03 15:00:00', '2026-10-03 14:30:00'),
-(11, 2, 5,    1, NULL, 'member_joined',   'Vũ Phương Thảo đã tham gia dự án «Xây dựng Website Thương mại điện tử».',            TRUE,  '2026-09-02 10:00:00', '2026-09-02 09:30:00'),
-(12, 2, 5,    3, 21,   'task_completed',  'Vũ Phương Thảo đã hoàn thành công việc «Tổng kết báo cáo chiến dịch».',              TRUE,  '2026-09-29 16:00:00', '2026-09-29 15:00:00');
+INSERT INTO notifications (id, user_id, actor_id, project_id, task_id, type, title, message, entity_type, entity_id, is_read, read_at, created_at) VALUES
+(1,  3, 2,    1, 5,    'task_assigned',   'Công việc mới được giao',        'Trần Quang Minh đã giao cho bạn công việc «Tích hợp cổng thanh toán VNPay».',        'task',    5,  TRUE,  '2026-10-15 09:00:00', '2026-10-15 08:40:00'),
+(2,  4, 2,    1, 5,    'task_assigned',   'Công việc mới được giao',        'Trần Quang Minh đã giao cho bạn công việc «Tích hợp cổng thanh toán VNPay».',        'task',    5,  TRUE,  '2026-10-15 10:00:00', '2026-10-15 08:40:00'),
+(3,  2, 3,    1, 5,    'comment_added',   'Bình luận mới',                  'Phạm Thị Lan đã bình luận trong «Tích hợp cổng thanh toán VNPay».',                  'comment', 1,  FALSE, NULL,                  '2026-10-16 09:15:00'),
+(4,  3, 2,    1, 5,    'mentioned',       'Bạn được nhắc tới',              'Trần Quang Minh đã nhắc đến bạn trong «Tích hợp cổng thanh toán VNPay».',            'comment', 2,  TRUE,  '2026-10-16 10:00:00', '2026-10-16 09:40:00'),
+(5,  3, 4,    1, 4,    'comment_added',   'Bình luận mới',                  'Lê Quốc Hùng đã bình luận trong «Xây dựng API sản phẩm và danh mục».',               'comment', 5,  FALSE, NULL,                  '2026-10-31 10:30:00'),
+(6,  5, 3,    1, 6,    'comment_added',   'Bình luận mới',                  'Phạm Thị Lan đã trả lời bình luận của bạn trong «Xây dựng chức năng giỏ hàng».',     'comment', 7,  FALSE, NULL,                  '2026-10-22 13:30:00'),
+(7,  2, NULL, 2, 14,   'task_due_soon',   'Sắp đến hạn công việc',          'Công việc «Màn hình thêm giao dịch» sẽ đến hạn vào 08/11/2026.',                     'task',    14, FALSE, NULL,                  '2026-11-04 08:00:00'),
+(8,  5, NULL, 2, 14,   'task_due_soon',   'Sắp đến hạn công việc',          'Công việc «Màn hình thêm giao dịch» sẽ đến hạn vào 08/11/2026.',                     'task',    14, FALSE, NULL,                  '2026-11-04 08:00:00'),
+(9,  3, NULL, 1, 5,    'task_due_soon',   'Sắp đến hạn công việc',          'Công việc «Tích hợp cổng thanh toán VNPay» sẽ đến hạn vào 10/11/2026.',              'task',    5,  FALSE, NULL,                  '2026-11-04 08:00:00'),
+(10, 4, 3,    2, NULL, 'project_invited', 'Lời mời tham gia dự án',         'Phạm Thị Lan đã mời bạn tham gia dự án «Ứng dụng Di động Quản lý Chi tiêu».',        'project', 2,  TRUE,  '2026-10-03 15:00:00', '2026-10-03 14:30:00'),
+(11, 2, 5,    1, NULL, 'member_joined',   'Thành viên mới tham gia dự án',  'Vũ Phương Thảo đã tham gia dự án «Xây dựng Website Thương mại điện tử».',            'project', 1,  TRUE,  '2026-09-02 10:00:00', '2026-09-02 09:30:00'),
+(12, 2, 5,    3, 21,   'task_completed',  'Công việc đã hoàn thành',        'Vũ Phương Thảo đã hoàn thành công việc «Tổng kết báo cáo chiến dịch».',              'task',    21, TRUE,  '2026-09-29 16:00:00', '2026-09-29 15:00:00');
  
 INSERT INTO activity_logs (id, project_id, task_id, user_id, entity_type, entity_id, action, old_value, new_value, created_at) VALUES
 (1,  1, NULL, 2, 'project',    1,  'created',          NULL,                                  '{"name": "Xây dựng Website Thương mại điện tử"}',                  '2026-09-01 08:00:00'),

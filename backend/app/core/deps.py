@@ -48,4 +48,3 @@ def require_role(*allowed_roles: str):
         return current_user
 
     return checker
-

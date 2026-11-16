@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.exc import OperationalError
@@ -14,6 +14,7 @@ from app.routers import (
     label_router, task_router, my_tasks_router,
     checklist_router, comment_router, attachment_router,
     notification_router, activity_log_router, ws_router,
+    admin_router,
 )
 
 
@@ -67,6 +68,7 @@ app.include_router(attachment_router, prefix="/api")
 app.include_router(notification_router, prefix="/api")
 app.include_router(activity_log_router, prefix="/api")
 app.include_router(ws_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 
 
 @app.get("/")
@@ -76,3 +78,8 @@ def root():
         "docs_url": "/docs",
         "api_prefix": "/api"
     }
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return Response(status_code=204)

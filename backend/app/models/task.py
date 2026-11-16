@@ -1,6 +1,7 @@
-from sqlalchemy import Column, BigInteger, String, Text, Integer, Boolean, DateTime, ForeignKey, Enum, func, UniqueConstraint, Index
+from sqlalchemy import Column, BigInteger, String, Text, Integer, Boolean, DateTime, ForeignKey, Enum, func, Index
 from sqlalchemy.orm import relationship
 from app.db.session import Base
+from app.models.task_label import TaskLabel  # noqa: F401 - re-export for convenience
 
 
 class Task(Base):
@@ -50,14 +51,3 @@ class TaskAssignee(Base):
     # Relationships
     task = relationship("Task", back_populates="assignees")
     user = relationship("User", back_populates="assigned_tasks")
-
-
-class TaskLabel(Base):
-    __tablename__ = "task_labels"
-
-    task_id = Column(BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True)
-    label_id = Column(BigInteger, ForeignKey("labels.id", ondelete="CASCADE"), primary_key=True)
-
-    # Relationships
-    task = relationship("Task", back_populates="labels")
-    label = relationship("Label", back_populates="tasks")

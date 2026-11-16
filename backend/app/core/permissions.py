@@ -6,6 +6,7 @@ from app.models.user import User
 from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.models.task import Task
+from app.crud.project import get_active_project_by_id
 
 
 def get_project_and_membership(
@@ -13,11 +14,7 @@ def get_project_and_membership(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> tuple[Project, ProjectMember]:
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id, Project.deleted_at.is_(None))
-        .first()
-    )
+    project = get_active_project_by_id(db, project_id)
     if not project:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

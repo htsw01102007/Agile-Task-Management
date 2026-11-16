@@ -8,10 +8,11 @@ class ProjectInvitation(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     project_id = Column(BigInteger, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
-    inviter_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    inviter_id = Column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     invitee_email = Column(String(255), nullable=False, index=True)
     invitee_id = Column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     role = Column(Enum("manager", "member", "viewer"), nullable=False, default="member")
+    # Lưu bản băm SHA-256 hex (64 ký tự) của token lời mời
     token = Column(CHAR(64), unique=True, nullable=False)
     status = Column(Enum("pending", "accepted", "declined", "expired", "cancelled"), nullable=False, default="pending", index=True)
     expires_at = Column(DateTime, nullable=False)
@@ -22,4 +23,3 @@ class ProjectInvitation(Base):
     project = relationship("Project", back_populates="invitations")
     inviter = relationship("User", foreign_keys=[inviter_id], back_populates="sent_invitations")
     invitee = relationship("User", foreign_keys=[invitee_id], back_populates="received_invitations")
-

@@ -21,9 +21,30 @@ function formatDateTime(value) {
 
 // Hiện thông báo nhỏ ở góc màn hình. type: "success" | "error"
 function showToast(message, type = "success") {
+  let container = document.getElementById("toasts");
+  if (!container) {
+    container = document.createElement("div");
+    container.id = "toasts";
+    container.setAttribute("role", "status");
+    container.setAttribute("aria-live", "polite");
+    document.body.appendChild(container);
+  }
   const toast = document.createElement("div");
-  toast.className = `toast toast-${type}`;
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+  toast.className = `toast toast-${type === "error" ? "error" : "success"}`;
+  const icon = document.createElement("span");
+  icon.className = "t-ic";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = type === "error" ? "!" : "✓";
+  const text = document.createElement("span");
+  text.className = "t-msg";
+  text.textContent = message;
+  const close = document.createElement("button");
+  close.className = "t-x";
+  close.type = "button";
+  close.setAttribute("aria-label", "Đóng thông báo");
+  close.textContent = "×";
+  close.addEventListener("click", () => toast.remove());
+  toast.append(icon, text, close);
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 4200);
 }

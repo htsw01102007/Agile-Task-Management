@@ -1,28 +1,41 @@
-# Base code dự án thực tập: HN-KS25-CNTT1
+# Agile Task Management
 
-Khung dự án chung cho các nhóm (04/11 – 25/11/2026). Gồm 2 phần đã nối sẵn với nhau:
+Ứng dụng quản lý dự án theo mô hình Kanban, gồm backend FastAPI/MySQL và frontend HTML/CSS/JavaScript.
 
-| Thư mục | Công nghệ | Hướng dẫn |
-|---|---|---|
-| [`backend/`](backend/README.md) | Python FastAPI + MySQL (SQLAlchemy) | `backend/README.md` |
-| [`frontend/`](frontend/README.md) | HTML · CSS · JavaScript thuần + axios | `frontend/README.md` |
+## Chức năng chính
 
-```
-Trình duyệt (frontend) --axios JSON--> FastAPI (backend :8000/api) --SQLAlchemy--> MySQL (:3306)
-```
+- Đăng ký, đăng nhập, cập nhật hồ sơ và đăng nhập Google OAuth2.
+- Quản lý dự án, thành viên, lời mời, danh sách và công việc.
+- Checklist, bình luận, tệp đính kèm, thông báo và nhật ký hoạt động.
+- Quản trị người dùng và theo dõi thống kê dự án.
 
-## Chạy nhanh
+## Chạy lần đầu
 
-1. **MySQL Workbench:** File → Open SQL Script → chọn `backend/sql/init.sql` → bấm ⚡ Execute.
-2. **Backend** (terminal trong thư mục `backend/`):
-   ```bash
-   copy .env.example .env               # Mac/Linux: cp .env.example .env
-   # mở .env, điền DB_PASSWORD = mật khẩu root MySQL của bạn
-   python -m venv .venv
-   .venv\Scripts\activate               # Mac/Linux: source .venv/bin/activate
-   pip install -r requirements.txt
-   uvicorn app.main:app --reload        # http://127.0.0.1:8000/docs
+1. Cài Python 3.10+ và MySQL 8+, hoặc dùng Docker nếu đã cài Docker Compose.
+2. Tạo `.env` tại thư mục gốc từ `.env.example`, sau đó điền `DB_PASSWORD` và tạo `SECRET_KEY` ngẫu nhiên. Cấu hình database mặc định là `agile_task_management`.
+3. Tạo database:
+   - MySQL cài trực tiếp: chạy `backend/sql/init.sql` bằng MySQL Workbench.
+   - Docker: từ thư mục `backend/`, chạy `docker compose up -d`.
+4. Từ thư mục gốc, tạo và kích hoạt môi trường ảo rồi cài dependencies:
+
+   ```powershell
+   py -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   pip install -r backend\requirements.txt
    ```
-3. **Frontend:** VS Code → chuột phải `frontend/index.html` → *Open with Live Server*.
 
-Trang chủ frontend hiện **✅ Backend OK · MySQL: connected** là đã thông cả 3 tầng. Sau đó mỗi nhóm đổi ví dụ `items` thành các chức năng của đề tài mình (xem mục *Thêm chức năng* / *Thêm trang mới* trong từng README).
+5. Khởi chạy backend từ thư mục `backend/`:
+
+   ```powershell
+   uvicorn app.main:app --reload
+   ```
+
+   API docs: http://127.0.0.1:8000/docs
+
+   Health check: http://127.0.0.1:8000/api/health
+
+6. Mở `frontend/index.html` bằng VS Code Live Server. Mặc định frontend chạy ở http://127.0.0.1:5500; API URL được cấu hình trong `frontend/js/config.js`.
+
+Google OAuth là tùy chọn. Cấu hình `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` và đăng ký callback URI tương ứng với `GOOGLE_REDIRECT_URI` trong Google Cloud Console.
+
+Xem hướng dẫn chi tiết ở [backend/README.md](backend/README.md) và [frontend/README.md](frontend/README.md).

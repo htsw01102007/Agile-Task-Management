@@ -1,66 +1,8 @@
 <!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Items | KS25 Base</title>
-  <link rel="icon" href="../assets/images/logo.svg">
-  <link rel="stylesheet" href="../css/style.css">
-</head>
-<body data-root="../">
-  <header id="app-header"></header>
-
-  <main class="container layout-2col">
-    <!-- Form thêm / sửa -->
-    <section class="card">
-      <h2 id="form-title">Thêm item mới</h2>
-      <form id="item-form">
-        <label for="name">Tên *</label>
-        <input id="name" name="name" type="text" required maxlength="255" placeholder="VD: Cơm rang">
-
-        <label for="price">Giá (VNĐ)</label>
-        <input id="price" name="price" type="number" min="0" step="1000" placeholder="0">
-
-        <label for="description">Mô tả</label>
-        <textarea id="description" name="description" rows="3" placeholder="Không bắt buộc"></textarea>
-
-        <div class="form-actions">
-          <button id="btn-submit" type="submit" class="btn btn-primary">Thêm</button>
-          <button id="btn-cancel" type="button" class="btn" hidden>Huỷ</button>
-        </div>
-      </form>
-    </section>
-
-    <!-- Danh sách -->
-    <section class="card">
-      <div class="list-header">
-        <h2>Danh sách items</h2>
-        <input id="search-input" type="search" placeholder="Tìm theo tên...">
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Tên</th>
-              <th class="text-right">Giá</th>
-              <th>Ngày tạo</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="item-table-body"></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
-
-  <footer id="app-footer"></footer>
-
-  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
-  <script src="../js/config.js"></script>
-  <script src="../js/api.js"></script>
-  <script src="../js/utils.js"></script>
-  <script src="../js/layout.js"></script>
-  <script src="../js/pages/items.js"></script>
-</body>
-</html>
+<html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Items | Agile Workspace</title><link rel="icon" href="../assets/images/logo.svg"><link rel="stylesheet" href="../css/style.css"></head>
+<body data-root="../"><div id="app"><header id="app-header" class="hdr"></header><aside id="app-sidebar" class="side"></aside><main class="page-content">
+  <div class="crumb"><a href="../index.html">Không gian làm việc</a><span>›</span> Items</div><div class="page-heading"><div><p class="eyebrow">CÔNG CỤ MẪU</p><h1>Quản lý Items</h1><p class="muted">Ví dụ CRUD kết nối API backend.</p></div></div>
+  <div class="layout-2col"><section class="content-panel"><h2 id="form-title">Thêm item mới</h2><form id="item-form"><label for="name">Tên *</label><input id="name" name="name" type="text" required maxlength="255" placeholder="VD: Cơm rang"><label for="price">Giá (VNĐ)</label><input id="price" name="price" type="number" min="0" step="1000" placeholder="0"><label for="description">Mô tả</label><textarea id="description" name="description" rows="3" placeholder="Không bắt buộc"></textarea><div class="form-actions"><button id="btn-submit" type="submit" class="btn btn-primary">Thêm</button><button id="btn-cancel" type="button" class="btn" hidden>Huỷ</button></div></form></section>
+  <section class="content-panel"><div class="list-header"><div><h2>Danh sách items</h2><p class="muted">Tìm, cập nhật hoặc xoá dữ liệu mẫu.</p></div><input id="search-input" type="search" placeholder="Tìm theo tên..." aria-label="Tìm item"></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Tên</th><th class="text-right">Giá</th><th>Ngày tạo</th><th></th></tr></thead><tbody id="item-table-body"></tbody></table></div></section></div>
+</main></div><div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
+<script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script><script src="../js/config.js"></script><script src="../js/api.js"></script><script src="../js/utils.js"></script><script src="../js/layout.js"></script><script src="../js/pages/items.js"></script></body></html>

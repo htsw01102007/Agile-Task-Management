@@ -21,4 +21,3 @@ __all__ = [
     "generate_reset_token",
     "hash_reset_token",
 ]
-

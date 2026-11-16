@@ -1,16 +1,13 @@
-"""
-Đọc cấu hình từ file .env (không ghi bí mật vào source để commit).
-Muốn thêm cấu hình mới: thêm 1 dòng vào class Settings
-và khai báo biến tương ứng trong file .env / .env.example.
-"""
+"""Đọc cấu hình từ file .env ở thư mục gốc project (không phụ thuộc thư mục chạy lệnh).
 
+Muốn thêm cấu hình mới: thêm 1 dòng vào class Settings + thêm vào .env.example.
+"""
 from pathlib import Path
 from urllib.parse import quote_plus
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-# backend/app/core/config.py -> thư mục gốc project (nơi đặt file .env duy nhất)
+# backend/app/core/config.py -> thư mục gốc Agile-Task-Management
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _ENV_FILE = _PROJECT_ROOT / ".env"
 
@@ -22,37 +19,35 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    APP_NAME: str = "Task Project Management API"
+    APP_NAME: str = "Agile Task Management API"
     ENV: str = "development"
 
-    # MySQL — bắt buộc khai báo trong .env, không có giá trị mặc định
     DB_HOST: str = "127.0.0.1"
     DB_PORT: int = 3306
-    DB_USER: str
-    DB_PASSWORD: str
-    DB_NAME: str
+    DB_USER: str = ""
+    DB_PASSWORD: str = ""
+    DB_NAME: str = "agile_task_management"
 
-    # JWT — bắt buộc trong .env
-    SECRET_KEY: str
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     PASSWORD_RESET_EXPIRE_MINUTES: int = 30
 
-    # Google OAuth2 — để trống nếu chưa dùng đăng nhập Google
+    FRONTEND_URL: str = "http://127.0.0.1:5500"
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/auth/google/callback"
+    GOOGLE_REDIRECT_URI: str = "http://127.0.0.1:8000/api/auth/google/callback"
 
-    # Frontend / CORS
-    FRONTEND_URL: str = "http://localhost:5173"
+    # Chuỗi các origin cách nhau bằng dấu phẩy, hoặc "*"
     CORS_ORIGINS: str = "*"
 
     @property
     def database_url(self) -> str:
+        # mysql+pymysql://user:password@host:port/database
+        # quote_plus: để mật khẩu có ký tự đặc biệt (@, #, /...) không làm hỏng URL
         return (
-            "mysql+pymysql://"
-            f"{quote_plus(self.DB_USER)}:{quote_plus(self.DB_PASSWORD)}"
+            f"mysql+pymysql://{quote_plus(self.DB_USER)}:{quote_plus(self.DB_PASSWORD)}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
         )
 

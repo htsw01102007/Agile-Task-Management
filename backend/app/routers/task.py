@@ -419,6 +419,22 @@ def get_my_tasks_in_project(
     )
 
 
+@router.get("/deleted", response_model=List[TaskResponse])
+def list_deleted_tasks(
+    project_id: int,
+    db: Session = Depends(get_db),
+    data: tuple = Depends(require_project_roles("owner", "manager", allow_read_only_when_inactive=True)),
+):
+    """Danh sách các công việc đã xoá mềm trong dự án (Thùng rác)"""
+    project, _ = data
+    return (
+        db.query(Task)
+        .filter(Task.project_id == project_id, Task.is_deleted.is_(True))
+        .order_by(Task.deleted_at.desc(), Task.id.desc())
+        .all()
+    )
+
+
 @router.get("/{task_id}", response_model=TaskDetailResponse)
 def get_task_detail(
     project_id: int,

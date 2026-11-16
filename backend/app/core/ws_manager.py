@@ -106,4 +106,3 @@ def notify_user_sync(user_id: int, event_type: str, data: Any) -> None:
                 loop.create_task(ws_manager.broadcast_user(user_id, event_type, data))
         except Exception:
             pass
-

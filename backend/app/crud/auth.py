@@ -320,4 +320,3 @@ def authenticate_google_user(
             db.commit()
 
     return issue_tokens(db, user)
-

@@ -9,6 +9,7 @@ from app.models.project import Project
 from app.models.task import Task, TaskAssignee
 from app.models.notification import Notification
 from app.models.activity_log import ActivityLog
+from app.crud.project import transfer_project_ownership
 from app.schemas.project_member import ProjectMemberResponse, MemberUpdateRole
 
 router = APIRouter(prefix="/projects/{project_id}/members", tags=["Members"])
@@ -121,33 +122,7 @@ def transfer_ownership(
     if not target_member:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thành viên nhận quyền không tồn tại trong dự án")
 
-    old_owner_id = owner_member.user_id
-    owner_member.role = "manager"
-    target_member.role = "owner"
-    project.owner_id = user_id
-
-    db.add(Notification(
-        user_id=user_id,
-        type="member_role_changed",
-        title=f"Bạn đã trở thành Owner của dự án '{project.name}'",
-        message=f"Quyền sở hữu dự án '{project.name}' đã được chuyển cho bạn.",
-        entity_type="project",
-        entity_id=project_id,
-        project_id=project_id,
-    ))
-    db.add(ActivityLog(
-        project_id=project_id,
-        user_id=old_owner_id,
-        entity_type="project",
-        entity_id=project_id,
-        action="ownership_transferred",
-        old_value=f'{{"owner_id": {old_owner_id}}}',
-        new_value=f'{{"owner_id": {user_id}}}',
-    ))
-
-    db.commit()
-    db.refresh(target_member)
-    return target_member
+    return transfer_project_ownership(db, project, owner_member, target_member)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
