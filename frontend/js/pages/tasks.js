@@ -139,15 +139,21 @@ board.addEventListener("focusin", (event) => {
 // ---------- Xoá task có xác nhận ----------
 board.addEventListener("click", async (event) => {
   const button = event.target.closest('button[data-action="delete"]');
-  if (!button) return;
+  if (!button || button.disabled) return;
+  button.disabled = true; // tránh double-click tạo confirm chồng nhau
   const card = button.closest(".task-card");
-  if (!confirm(`Xoá task "${card.querySelector(".task-title").textContent}"?`))
+  if (
+    !confirm(`Xoá task "${card.querySelector(".task-title").textContent}"?`)
+  ) {
+    button.disabled = false;
     return;
+  }
   try {
     await api.delete(`/tasks/${card.dataset.taskId}`, headers());
     card.remove(); // xoá khỏi màn hình ngay (DB chỉ đánh dấu deleted_at)
   } catch (error) {
     alert(error.message);
+    button.disabled = false;
   }
 });
 

@@ -60,6 +60,14 @@ SELECT p.id, c.name, c.pos, c.done FROM projects p JOIN (
   UNION SELECT 'Hoàn thành', 3, 1
 ) c WHERE p.name = 'Dự án mẫu';
 
+-- Đổi FK tasks.list_id: xoá list thì task KHÔNG bị xoá cứng mà list_id = NULL
+-- (task đã được xoá mềm bằng UPDATE trước đó, giữ lại làm dữ liệu lịch sử).
+-- Bảng đã tồn tại rồi thì chạy riêng 3 câu ALTER dưới đây.
+ALTER TABLE tasks DROP FOREIGN KEY tasks_ibfk_2;
+ALTER TABLE tasks MODIFY list_id BIGINT NULL;
+ALTER TABLE tasks ADD CONSTRAINT fk_tasks_list FOREIGN KEY (list_id)
+  REFERENCES lists(id) ON DELETE SET NULL;
+
 -- Ràng buộc nghiệp vụ tasks (MySQL 8.0.16+ mới hỗ trợ CHECK):
 -- Hạn chót phải sau hoặc bằng ngày bắt đầu (một trong hai có thể NULL).
 -- Bảng đã tồn tại rồi thì chạy riêng câu ALTER dưới đây.

@@ -8,7 +8,8 @@ class Task(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     project_id = Column(BigInteger, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
-    list_id = Column(BigInteger, ForeignKey("lists.id", ondelete="CASCADE"), nullable=False, index=True)
+    # list_id NULL = task đã bị "xoá theo list" (list bị xoá, task giữ lại làm dữ liệu lịch sử)
+    list_id = Column(BigInteger, ForeignKey("lists.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
     priority = Column(Enum("low", "medium", "high", "urgent", name="task_priority"), nullable=False, default="medium")

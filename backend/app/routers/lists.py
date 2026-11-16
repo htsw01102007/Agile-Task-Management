@@ -6,7 +6,7 @@ PUT    .../lists/{list_id}    sửa tên/cột hoàn thành (manager trở lên)
 PUT    .../lists/reorder      đổi thứ tự theo mảng id   (manager trở lên)
 DELETE .../lists/{list_id}    xoá list        (manager trở lên)
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.permissions import require_role
@@ -84,7 +84,20 @@ def update_list(
     _: object = Depends(write_access),
     db: Session = Depends(get_db),
 ):
-    return list_crud.update_list(db, item, data)
+    """Đổi tên list; nếu payload có is_done_column thì áp quy tắc
+    "mỗi project tối đa 1 cột hoàn thành"."""
+    updated = list_crud.update_list(db, item, data)
+    return updated
+
+
+@router.put("/{list_id}/done", response_model=ListOut)
+def mark_done_column(
+    item: ListModel = Depends(get_list_or_404),
+    _: object = Depends(write_access),
+    db: Session = Depends(get_db),
+):
+    """Đánh dấu đây là cột hoàn thành (tự bỏ cờ ở các cột khác cùng project)."""
+    return list_crud.set_done_column(db, item, True)
 
 
 @router.delete("/{list_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -93,4 +106,8 @@ def delete_list(
     _: object = Depends(write_access),
     db: Session = Depends(get_db),
 ):
-    list_crud.delete_list(db, item)
+    """Xoá list: xoá MỀM toàn bộ task trong list + cập nhật position các list
+    còn lại — tất cả trong một transaction. FE đọc header X-Deleted-Tasks
+    để biết số task bị xoá."""
+    deleted_tasks = list_crud.soft_delete_list(db, item)
+    return Response(status_code=204, headers={"X-Deleted-Tasks": str(deleted_tasks)})

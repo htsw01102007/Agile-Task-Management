@@ -124,9 +124,14 @@ tableBody.addEventListener("click", async (event) => {
         break;
       }
       case "toggle-done": {
-        // Lấy trạng thái hiện tại từ chữ trong ô để đảo lại
+        // Đánh dấu / bỏ cột hoàn thành: dùng endpoint /done để đảm bảo
+        // mỗi project chỉ có 1 cột hoàn thành
         const isDone = row.children[3].textContent.includes("✅");
-        await api.put(`${BASE}/${id}`, { is_done_column: !isDone }, headers());
+        if (isDone) {
+          await api.put(`${BASE}/${id}`, { is_done_column: false }, headers());
+        } else {
+          await api.put(`${BASE}/${id}/done`, {}, headers());
+        }
         break;
       }
       case "edit": {
@@ -139,16 +144,46 @@ tableBody.addEventListener("click", async (event) => {
         cancelButton.hidden = false;
         return;
       }
-      case "delete":
-        if (!confirm("Xoá cột này? (toàn bộ task trong cột cũng bị xoá)"))
-          return;
+      case "delete": {
+        // Hỏi trước số task sẽ bị xoá: đếm task của cột qua API tasks
+        let taskCount = 0;
+        try {
+          const tasks = await api.get(
+            `/lists/${id}/tasks`,
+            undefined,
+            headers()
+          );
+          taskCount = tasks.length;
+        } catch {
+          /* không đếm được thì vẫn cho xoá */
+        }
+        const msg =
+          taskCount > 0
+            ? `Xoá cột này? Sẽ xoá mềm ${taskCount} task trong cột.`
+            : "Xoá cột này?";
+        if (!confirm(msg)) return;
         await api.delete(`${BASE}/${id}`, headers());
         break;
+      }
     }
     loadLists();
   } catch (error) {
     showError(error);
   }
+});
+
+// Đổi tên trực tiếp: dblclick vào tên cột đưa tên lên form
+tableBody.addEventListener("dblclick", (event) => {
+  const strong = event.target.closest("strong");
+  if (!strong) return;
+  const row = strong.closest("tr");
+  editingId = Number(row.dataset.id);
+  form.name.value = strong.textContent;
+  form.is_done_column.checked = row.children[3].textContent.includes("✅");
+  formTitle.textContent = `Đổi tên cột #${editingId}`;
+  submitButton.textContent = "Lưu";
+  cancelButton.hidden = false;
+  form.name.focus();
 });
 
 loadLists();
