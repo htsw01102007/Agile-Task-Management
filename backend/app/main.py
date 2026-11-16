@@ -28,6 +28,28 @@ def _ensure_schema_migrations() -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0"))
 
+    if inspector.has_table("project_invitations"):
+        inv_columns = {col["name"] for col in inspector.get_columns("project_invitations")}
+        if "pending_email" not in inv_columns:
+            try:
+                with engine.begin() as conn:
+                    # Đóng các lời mời pending đã quá hạn trước khi thêm ràng buộc UNIQUE
+                    conn.execute(text(
+                        "UPDATE project_invitations SET status = 'expired' "
+                        "WHERE status = 'pending' AND expires_at < UTC_TIMESTAMP()"
+                    ))
+                    conn.execute(text(
+                        "ALTER TABLE project_invitations ADD COLUMN pending_email VARCHAR(255) "
+                        "GENERATED ALWAYS AS (CASE WHEN status = 'pending' "
+                        "THEN LOWER(invitee_email) ELSE NULL END) VIRTUAL"
+                    ))
+                    conn.execute(text(
+                        "ALTER TABLE project_invitations ADD CONSTRAINT uq_invitations_pending "
+                        "UNIQUE (project_id, pending_email)"
+                    ))
+            except Exception as error:  # dữ liệu cũ còn lời mời pending trùng
+                print(f"[DB] Không thể thêm ràng buộc chống mời trùng pending: {error}")
+
 
 settings.validate_production_settings()
 

@@ -61,7 +61,12 @@ CREATE TABLE project_invitations (
     expires_at      DATETIME NOT NULL,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     responded_at    DATETIME NULL,
+    -- Chỉ có giá trị khi status = 'pending' -> UNIQUE (project_id, pending_email) chặn 2 lời mời pending trùng ở tầng DB
+    pending_email   VARCHAR(255) GENERATED ALWAYS AS (
+                        CASE WHEN status = 'pending' THEN LOWER(invitee_email) ELSE NULL END
+                    ) VIRTUAL,
     CONSTRAINT uq_invitations_token UNIQUE (token),
+    CONSTRAINT uq_invitations_pending UNIQUE (project_id, pending_email),
     CONSTRAINT fk_inv_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
     CONSTRAINT fk_inv_inviter FOREIGN KEY (inviter_id) REFERENCES users (id) ON DELETE SET NULL,
     CONSTRAINT fk_inv_invitee FOREIGN KEY (invitee_id) REFERENCES users (id) ON DELETE SET NULL,

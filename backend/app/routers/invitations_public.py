@@ -1,6 +1,7 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone
@@ -55,6 +56,14 @@ def accept_invitation(
     invitation = find_invitation_by_token(db, token)
     if not invitation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lời mời không tồn tại")
+    # Khoá dòng lời mời: 2 request chấp nhận đồng thời sẽ được xử lý tuần tự
+    invitation = (
+        db.query(ProjectInvitation)
+        .filter(ProjectInvitation.id == invitation.id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if invitation.status != "pending":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời không còn hiệu lực")
     if invitation.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
@@ -116,7 +125,12 @@ def accept_invitation(
         )
     )
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Thêm project_members và cập nhật lời mời nằm trong cùng transaction -> rollback cả hai
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bạn đã là thành viên của dự án")
     return {"message": "Đã chấp nhận lời mời tham gia dự án"}
 
 
