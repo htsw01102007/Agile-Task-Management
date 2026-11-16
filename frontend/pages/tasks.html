@@ -111,6 +111,47 @@
         gap: 8px;
         margin-top: 12px;
       }
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin: 8px 0;
+      }
+      .filters input,
+      .filters select {
+        padding: 4px 6px;
+      }
+      .pagination {
+        display: flex;
+        gap: 4px;
+        margin: 8px 0;
+      }
+      .pagination button {
+        min-width: 32px;
+      }
+      .pagination button[disabled] {
+        opacity: 0.5;
+      }
+      .pagination .current {
+        font-weight: 700;
+        text-decoration: underline;
+      }
+      .result-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px;
+        border-bottom: 1px solid #eee;
+      }
+      .result-row .badge-high {
+        color: #e03131;
+        font-weight: 700;
+      }
+      .result-row .badge-urgent {
+        color: #d9480f;
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
@@ -128,6 +169,35 @@
         />
         (10 = manager; thử 11 = member, 12 = viewer để thấy bị chặn)
       </p>
+
+      <!-- Thanh lọc + tìm + phân trang (chế độ danh sách) -->
+      <details class="filter-bar" open>
+        <summary>Lọc &amp; tìm task</summary>
+        <form id="filter-form" class="filters">
+          <input id="f-q" placeholder="Tìm từ khoá (tiêu đề/mô tả)" />
+          <select id="f-priority">
+            <option value="">Ưu tiên: tất cả</option>
+            <option value="low">Thấp</option>
+            <option value="medium">Trung bình</option>
+            <option value="high">Cao</option>
+            <option value="urgent">Khẩn cấp</option>
+          </select>
+          <select id="f-status">
+            <option value="">Trạng thái: tất cả</option>
+            <option value="open">Chưa xong</option>
+            <option value="done">Hoàn thành</option>
+          </select>
+          <select id="f-assignee">
+            <option value="">Người thực hiện: tất cả</option>
+          </select>
+          <label>Hạn từ <input id="f-due-after" type="date" /></label>
+          <label>đến <input id="f-due-before" type="date" /></label>
+          <button type="submit">Lọc</button>
+          <button type="button" id="f-reset">Xoá lọc</button>
+        </form>
+        <div id="search-results"></div>
+        <div id="pagination" class="pagination"></div>
+      </details>
 
       <div id="board" class="board"></div>
     </main>

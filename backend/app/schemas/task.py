@@ -31,9 +31,18 @@ class TaskOut(TaskBase):
     model_config = ConfigDict(from_attributes=True)
     id: int
     project_id: int
-    list_id: int
+    list_id: int | None = None
     position: int
     completed_at: datetime | None
     is_deleted: bool
     created_at: datetime
     updated_at: datetime
+
+
+class PaginatedTasks(BaseModel):
+    """Kết quả phân trang: items + tổng số + trang hiện tại."""
+    items: list[TaskOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int

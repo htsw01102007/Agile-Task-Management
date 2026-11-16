@@ -275,5 +275,119 @@ board.addEventListener("click", (event) => {
   openAssignModal(Number(btn.closest(".task-card").dataset.taskId));
 });
 
+// ---------- Lọc + tìm + phân trang (dạng danh sách) ----------
+const filterForm = document.getElementById("filter-form");
+const resultsDiv = document.getElementById("search-results");
+const paginationDiv = document.getElementById("pagination");
+let currentPage = 1;
+
+// Đổ danh sách người thực hiện vào select lọc
+async function loadAssigneeOptions() {
+  const sel = document.getElementById("f-assignee");
+  for (const m of PROJECT_MEMBERS) {
+    const opt = document.createElement("option");
+    opt.value = m.user_id;
+    opt.textContent = m.full_name;
+    sel.appendChild(opt);
+  }
+}
+
+function readFilters() {
+  const params = new URLSearchParams();
+  const q = document.getElementById("f-q").value.trim();
+  const pr = document.getElementById("f-priority").value;
+  const st = document.getElementById("f-status").value;
+  const as = document.getElementById("f-assignee").value;
+  const da = document.getElementById("f-due-after").value;
+  const db = document.getElementById("f-due-before").value;
+  if (q) params.set("q", q);
+  if (pr) params.set("priority", pr);
+  if (st) params.set("task_status", st);
+  if (as) params.set("assignee_id", as);
+  if (da) params.set("due_after", `${da}T00:00:00`);
+  if (db) params.set("due_before", `${db}T23:59:59`);
+  params.set("page", currentPage);
+  params.set("page_size", 10);
+  return params;
+}
+
+async function runSearch() {
+  resultsDiv.innerHTML = "<p>Đang tìm...</p>";
+  paginationDiv.innerHTML = "";
+  try {
+    const data = await api.get(
+      `/projects/${PROJECT_ID}/tasks/search?${readFilters()}`,
+      undefined,
+      headers()
+    );
+    renderResults(data);
+  } catch (error) {
+    resultsDiv.innerHTML = `<p class="text-error">${error.message}</p>`;
+  }
+}
+
+function renderResults(data) {
+  if (data.total === 0) {
+    resultsDiv.innerHTML = `<p class="muted">Không có task nào khớp</p>`;
+    return;
+  }
+  resultsDiv.innerHTML = data.items
+    .map((t) => {
+      const avatars = (assigneesCache[t.id] || [])
+        .map((a) => avatarHtml(a.user_id, a.full_name, a.avatar_url))
+        .join("");
+      return `
+      <div class="result-row">
+        <span class="badge-${t.priority}">${t.priority}</span>
+        <strong>${escapeHtml(t.title)}</strong>
+        ${
+          t.list_name
+            ? `<span class="muted">· ${escapeHtml(t.list_name)}</span>`
+            : ""
+        }
+        ${
+          t.due_date
+            ? `<span class="muted">· hết hạn ${formatDateTime(
+                t.due_date
+              )}</span>`
+            : ""
+        }
+        ${t.completed_at ? "<span>✅</span>" : ""}
+        <span class="assignees">${avatars}</span>
+      </div>`;
+    })
+    .join("");
+
+  // Phân trang
+  let html = "";
+  for (let p = 1; p <= data.total_pages; p++) {
+    html += `<button data-page="${p}" class="${
+      p === data.page ? "current" : ""
+    }" ${p === data.page ? "disabled" : ""}>${p}</button>`;
+  }
+  paginationDiv.innerHTML = html;
+}
+
+filterForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  currentPage = 1;
+  runSearch();
+});
+
+document.getElementById("f-reset").addEventListener("click", () => {
+  filterForm.reset();
+  currentPage = 1;
+  resultsDiv.innerHTML = "";
+  paginationDiv.innerHTML = "";
+});
+
+paginationDiv.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-page]");
+  if (!button) return;
+  currentPage = Number(button.dataset.page);
+  runSearch();
+});
+
+loadAssigneeOptions();
 userIdInput.addEventListener("change", loadBoard);
 loadBoard();

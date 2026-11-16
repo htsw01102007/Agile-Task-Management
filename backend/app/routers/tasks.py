@@ -6,15 +6,17 @@ PATCH  .../tasks/{task_id}      sửa (tiêu đề, hạn chót, ưu tiên...) �
 DELETE .../tasks/{task_id}      xoá MỀM (đặt deleted_at)        — manager trở lên
 POST   .../tasks/{task_id}/restore  khôi phục task đã xoá mềm   — manager trở lên
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.permissions import get_current_user_id, require_list_role, require_task_role
+from app.core.permissions import get_current_user_id, require_list_role, require_task_role, require_role
 from app.crud import task as task_crud
 from app.db.session import get_db
 from app.models.list import ListModel
 from app.models.task import Task
-from app.schemas.task import TaskCreate, TaskOut, TaskUpdate
+from app.schemas.task import PaginatedTasks, TaskCreate, TaskOut, TaskUpdate
 
 router = APIRouter(tags=["Tasks"])
 
@@ -45,6 +47,55 @@ def get_tasks_by_list(
     db: Session = Depends(get_db),
 ):
     return task_crud.get_tasks_by_list(db, parent.id)
+
+
+@router.get("/lists/{list_id}/tasks/search", response_model=PaginatedTasks)
+def search_tasks_in_list(
+    parent: ListModel = Depends(list_read_access),
+    priority: list[str] | None = Query(default=None, description="low medium high urgent"),
+    due_before: datetime | None = None,
+    due_after: datetime | None = None,
+    assignee_id: int | None = None,
+    task_status: str | None = Query(default=None, pattern="^(open|done)$"),
+    q: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Lọc/tìm task trong 1 cột + phân trang."""
+    items, total = task_crud.search_tasks(
+        db, list_id=parent.id, priority=priority, due_before=due_before,
+        due_after=due_after, assignee_id=assignee_id,
+        status_filter=task_status, q=q, page=page, page_size=page_size,
+    )
+    return {"items": items, "total": total, "page": page,
+            "page_size": page_size,
+            "total_pages": -(-total // page_size)}
+
+
+@router.get("/projects/{project_id}/tasks/search", response_model=PaginatedTasks)
+def search_tasks_in_project(
+    project_id: int = Path(...),
+    _: object = Depends(require_role("member")),
+    priority: list[str] | None = Query(default=None),
+    due_before: datetime | None = None,
+    due_after: datetime | None = None,
+    assignee_id: int | None = None,
+    task_status: str | None = Query(default=None, pattern="^(open|done)$"),
+    q: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Lọc/tìm task trên TOÀN project (mọi cột) + phân trang."""
+    items, total = task_crud.search_tasks(
+        db, project_id=project_id, priority=priority,
+        due_before=due_before, due_after=due_after, assignee_id=assignee_id,
+        status_filter=task_status, q=q, page=page, page_size=page_size,
+    )
+    return {"items": items, "total": total, "page": page,
+            "page_size": page_size,
+            "total_pages": -(-total // page_size)}
 
 
 @router.post("/lists/{list_id}/tasks", response_model=TaskOut,
