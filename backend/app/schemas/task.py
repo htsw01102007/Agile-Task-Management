@@ -101,7 +101,7 @@ class AttachmentResponse(BaseModel):
 
     id: int
     task_id: int
-    user_id: int
+    user_id: Optional[int] = None
     file_name: str
     file_path: str
     file_size: int

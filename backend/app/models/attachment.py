@@ -8,7 +8,7 @@ class Attachment(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, index=True)
     task_id = Column(BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column("uploaded_by", BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     file_name = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)  # relative path under /uploads
     file_size = Column(BigInteger, nullable=False)  # bytes

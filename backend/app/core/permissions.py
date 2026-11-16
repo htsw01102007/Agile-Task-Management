@@ -39,11 +39,14 @@ def get_project_and_membership(
     return project, member
 
 
-def require_project_roles(*allowed_roles: str, allow_read_only_when_inactive: bool = False):
+def require_project_roles(
+    *allowed_roles: str, allow_read_only_when_inactive: bool = False
+):
     """
     Dependency factory to check if the current user has one of the allowed roles
     in the specified project, and validates if project is active.
     """
+
     def dependency(
         data: tuple[Project, ProjectMember] = Depends(get_project_and_membership),
     ) -> tuple[Project, ProjectMember]:
@@ -56,7 +59,10 @@ def require_project_roles(*allowed_roles: str, allow_read_only_when_inactive: bo
             )
 
         # If project is completed or archived, modifications are blocked unless specifically allowed
-        if not allow_read_only_when_inactive and project.status in ["completed", "archived"]:
+        if not allow_read_only_when_inactive and project.status in [
+            "completed",
+            "archived",
+        ]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Dự án đang ở trạng thái '{project.status}' (chỉ đọc), không thể thực hiện thao tác này",
@@ -68,6 +74,7 @@ def require_project_roles(*allowed_roles: str, allow_read_only_when_inactive: bo
 
 
 # ===== TASK PERMISSIONS =====
+
 
 def get_task_and_membership(
     project_id: int,
@@ -81,7 +88,11 @@ def get_task_and_membership(
 
     task = (
         db.query(Task)
-        .filter(Task.id == task_id, Task.project_id == project_id, Task.is_deleted.is_(False))
+        .filter(
+            Task.id == task_id,
+            Task.project_id == project_id,
+            Task.is_deleted.is_(False),
+        )
         .first()
     )
     if not task:
@@ -109,11 +120,7 @@ def get_task_with_write_check(
         )
 
     # Check project status
-    project = (
-        db.query(Project)
-        .filter(Project.id == project_id)
-        .first()
-    )
+    project = db.query(Project).filter(Project.id == project_id).first()
     if project.status in ["completed", "archived"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -166,7 +173,9 @@ def get_task_for_restore(
 
     task = (
         db.query(Task)
-        .filter(Task.id == task_id, Task.project_id == project_id, Task.is_deleted.is_(True))
+        .filter(
+            Task.id == task_id, Task.project_id == project_id, Task.is_deleted.is_(True)
+        )
         .first()
     )
     if not task:

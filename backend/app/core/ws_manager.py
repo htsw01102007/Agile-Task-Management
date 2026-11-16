@@ -36,7 +36,9 @@ class ConnectionManager:
         if not conns and user_id in self.user_connections:
             del self.user_connections[user_id]
 
-    async def broadcast_project(self, project_id: int, event_type: str, data: Any) -> None:
+    async def broadcast_project(
+        self, project_id: int, event_type: str, data: Any
+    ) -> None:
         conns = list(self.project_connections.get(project_id, []))
         if not conns:
             return
@@ -83,12 +85,16 @@ def notify_project_sync(project_id: int, event_type: str, data: Any) -> None:
     if project_id not in ws_manager.project_connections:
         return
     try:
-        anyio.from_thread.run(ws_manager.broadcast_project, project_id, event_type, data)
+        anyio.from_thread.run(
+            ws_manager.broadcast_project, project_id, event_type, data
+        )
     except Exception:
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                loop.create_task(ws_manager.broadcast_project(project_id, event_type, data))
+                loop.create_task(
+                    ws_manager.broadcast_project(project_id, event_type, data)
+                )
         except Exception:
             pass
 
@@ -106,4 +112,3 @@ def notify_user_sync(user_id: int, event_type: str, data: Any) -> None:
                 loop.create_task(ws_manager.broadcast_user(user_id, event_type, data))
         except Exception:
             pass
-

@@ -40,7 +40,9 @@ def create_refresh_token(data: dict, expires_days: int | None = None) -> str:
 
 def _decode_token(token: str, expected_type: str) -> dict:
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
     except jwt.ExpiredSignatureError:
         raise ValueError("Token đã hết hạn")
     except jwt.InvalidTokenError:
@@ -66,4 +68,3 @@ def generate_reset_token() -> str:
 
 def hash_reset_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
-
