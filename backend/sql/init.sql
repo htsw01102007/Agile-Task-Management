@@ -73,3 +73,7 @@ ALTER TABLE tasks ADD CONSTRAINT fk_tasks_list FOREIGN KEY (list_id)
 -- Bảng đã tồn tại rồi thì chạy riêng câu ALTER dưới đây.
 ALTER TABLE tasks ADD CONSTRAINT chk_tasks_dates
   CHECK (due_date IS NULL OR start_date IS NULL OR due_date >= start_date);
+
+-- UNIQUE(task_id, user_id) trong task_assignees: một người chỉ được gán 1 lần
+-- cho 1 task (PK (task_id, user_id) đã đảm bảo; thêm UNIQUE tường minh).
+ALTER TABLE task_assignees ADD UNIQUE KEY uq_task_assignees_task_user (task_id, user_id);

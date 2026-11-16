@@ -3,6 +3,9 @@
 //   Thêm nhanh      -> POST   /lists/{id}/tasks    (manager trở lên)
 //   Sửa tiêu đề     -> PATCH  /tasks/{id}          (manager trở lên)
 //   Xoá (có confirm)-> DELETE /tasks/{id}          (manager trở lên)
+//   Gán người       -> PUT    /tasks/{id}/assignees (manager trở lên)
+//   Bỏ gán          -> DELETE /tasks/{id}/assignees/{uid}
+//   Việc của tôi    -> GET    /my-tasks
 
 const PROJECT_ID = 1;
 const userIdInput = document.getElementById("user-id");
@@ -29,6 +32,8 @@ async function loadBoard() {
         api.get(`/lists/${l.id}/tasks`, undefined, headers())
       )
     );
+    // Tải assignee cho mọi task rồi mới vẽ (để avatar hiện ngay từ đầu)
+    await loadAssignees(tasksPerList.flat().map((t) => t.id));
     renderBoard(tasksPerList);
   } catch (error) {
     board.innerHTML = `<p class="text-error">${error.message}</p>`;
@@ -56,6 +61,40 @@ function renderBoard(tasksPerList) {
   });
 }
 
+// Cache avatar/tên của assignee theo task để vẽ trên thẻ
+const assigneesCache = {}; // taskId -> [{user_id, full_name, avatar_url}]
+
+async function loadAssignees(taskIds) {
+  await Promise.all(
+    taskIds.map(async (id) => {
+      try {
+        assigneesCache[id] = await api.get(
+          `/tasks/${id}/assignees`,
+          undefined,
+          headers()
+        );
+      } catch {
+        assigneesCache[id] = [];
+      }
+    })
+  );
+}
+
+function avatarHtml(userId, fullName, avatarUrl) {
+  const initial = (fullName || `#${userId}`).trim().charAt(0).toUpperCase();
+  if (avatarUrl) {
+    return `<img class="avatar" src="${escapeHtml(
+      avatarUrl
+    )}" alt="${escapeHtml(fullName || "")}" title="${escapeHtml(
+      fullName || ""
+    )}" />`;
+  }
+  // Không có ảnh -> avatar chữ cái đầu
+  return `<span class="avatar avatar-letter" title="${escapeHtml(
+    fullName || ""
+  )}">${escapeHtml(initial)}</span>`;
+}
+
 function renderCard(task) {
   const card = document.createElement("div");
   card.className = "task-card";
@@ -63,12 +102,20 @@ function renderCard(task) {
   const due = task.due_date
     ? ` · hết hạn ${formatDateTime(task.due_date)}`
     : "";
+  // Avatar người thực hiện (đã tải trước bằng loadAssignees)
+  const assignees = (assigneesCache[task.id] || [])
+    .map((a) => avatarHtml(a.user_id, a.full_name, a.avatar_url))
+    .join("");
   card.innerHTML = `
     <div class="task-title" title="Bấm để sửa tiêu đề">${escapeHtml(
       task.title
     )}</div>
     <div class="task-meta">${task.priority}${due}</div>
-    <button class="btn btn-small btn-danger" data-action="delete">Xoá</button>`;
+    <div class="card-footer">
+      <button class="btn btn-small" data-action="assign">👤 Người thực hiện</button>
+      <span class="assignees">${assignees}</span>
+      <button class="btn btn-small btn-danger" data-action="delete">Xoá</button>
+    </div>`;
   return card;
 }
 
@@ -155,6 +202,77 @@ board.addEventListener("click", async (event) => {
     alert(error.message);
     button.disabled = false;
   }
+});
+
+// ---------- Modal chọn người thực hiện ----------
+// Modal đơn giản dựng bằng DOM; danh sách thành viên dự án lấy từ
+// GET /projects/{pid}/lists không có -> dùng endpoint members khi có.
+// Hiện tại: hardcode theo seed (id + tên); nhóm khác thay bằng GET /members.
+const PROJECT_MEMBERS = [
+  { user_id: 9, full_name: "An (owner)" },
+  { user_id: 10, full_name: "Bình (manager)" },
+  { user_id: 11, full_name: "Chi (member)" },
+  { user_id: 12, full_name: "Dũng (viewer)" },
+];
+
+async function openAssignModal(taskId) {
+  const current = assigneesCache[taskId] || [];
+  const currentIds = current.map((a) => a.user_id);
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal">
+      <h3>Người thực hiện — task #${taskId}</h3>
+      <div class="member-list">
+        ${PROJECT_MEMBERS.map(
+          (m) => `
+          <label>
+            <input type="checkbox" value="${m.user_id}"
+              ${currentIds.includes(m.user_id) ? "checked" : ""} />
+            ${avatarHtml(m.user_id, m.full_name)} ${escapeHtml(m.full_name)}
+          </label>`
+        ).join("")}
+      </div>
+      <div class="modal-actions">
+        <button class="btn" data-close>Huỷ</button>
+        <button class="btn btn-primary" data-save>Lưu</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector("[data-close]").onclick = () => overlay.remove();
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+  overlay.querySelector("[data-save]").onclick = async () => {
+    const picked = [...overlay.querySelectorAll("input:checked")].map((i) =>
+      Number(i.value)
+    );
+    try {
+      // Gán thêm người mới
+      for (const uid of picked.filter((id) => !currentIds.includes(id))) {
+        await api.put(
+          `/tasks/${taskId}/assignees`,
+          { user_id: uid },
+          headers()
+        );
+      }
+      // Bỏ gán người bị bỏ chọn
+      for (const uid of currentIds.filter((id) => !picked.includes(id))) {
+        await api.delete(`/tasks/${taskId}/assignees/${uid}`, headers());
+      }
+      overlay.remove();
+      loadBoard();
+    } catch (error) {
+      alert(error.message); // 422: không phải thành viên dự án / 409: đã gán
+    }
+  };
+}
+
+board.addEventListener("click", (event) => {
+  const btn = event.target.closest('button[data-action="assign"]');
+  if (!btn) return;
+  openAssignModal(Number(btn.closest(".task-card").dataset.taskId));
 });
 
 userIdInput.addEventListener("change", loadBoard);

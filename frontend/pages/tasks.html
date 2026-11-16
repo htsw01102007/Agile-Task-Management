@@ -56,6 +56,61 @@
       .quick-add input {
         flex: 1;
       }
+      .card-footer {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .card-footer .btn-danger {
+        margin-left: auto;
+      }
+      .assignees {
+        display: flex;
+        gap: 2px;
+      }
+      .avatar {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+      .avatar-letter {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #4dabf7;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+      }
+      .modal {
+        background: #fff;
+        border-radius: 8px;
+        padding: 16px;
+        width: 320px;
+      }
+      .member-list label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+      }
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 12px;
+      }
     </style>
   </head>
   <body>

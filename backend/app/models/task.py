@@ -47,6 +47,11 @@ class TaskAssignee(Base):
     task_id = Column(BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"), primary_key=True)
     user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
     assigned_at = Column(DateTime, nullable=False, server_default=func.now())
+    # UNIQUE(task_id, user_id): một người chỉ gán 1 lần cho 1 task
+    # (PK đã đảm bảo, thêm UNIQUE tường minh theo đúng spec DB)
+    __table_args__ = (
+        UniqueConstraint("task_id", "user_id", name="uq_task_assignees_task_user"),
+    )
 
     # Relationships
     task = relationship("Task", back_populates="assignees")
