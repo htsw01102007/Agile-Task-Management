@@ -131,7 +131,10 @@ def accept_invitation(
         # Thêm project_members và cập nhật lời mời nằm trong cùng transaction -> rollback cả hai
         db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bạn đã là thành viên của dự án")
-    return {"message": "Đã chấp nhận lời mời tham gia dự án"}
+    return {
+        "message": "Đã chấp nhận lời mời tham gia dự án",
+        "project_id": invitation.project_id,
+    }
 
 
 @router.post("/decline/{token}")

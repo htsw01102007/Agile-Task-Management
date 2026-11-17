@@ -68,6 +68,7 @@ def test_accept_adds_member_and_cannot_reuse(client, test_user_factory):
 
     acc = client.post(f"/api/invitations/accept/{raw}", headers=invitee["headers"])
     assert acc.status_code == 200, acc.text
+    assert acc.json()["project_id"] == project_id
 
     db = SessionLocal()
     try:
