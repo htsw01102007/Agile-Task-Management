@@ -54,3 +54,24 @@ def test_project_crud_my_role_and_member_permissions(client, test_user_factory):
         json={"name": "Blocked List"},
     ).status_code == 403
 
+    # Frontend connection endpoints: /projects/summary, /projects/dashboard/summary, /projects/{id}/board, /tasks/deleted
+    summary_resp = client.get("/api/projects/summary", headers=owner["headers"])
+    assert summary_resp.status_code == 200
+    assert any(p["id"] == project_id and p["user_role"] == "owner" for p in summary_resp.json())
+
+    dash_resp = client.get("/api/projects/dashboard/summary", headers=owner["headers"])
+    assert dash_resp.status_code == 200
+    assert "active_project_count" in dash_resp.json()
+
+    board_resp = client.get(f"/api/projects/{project_id}/board", headers=owner["headers"])
+    assert board_resp.status_code == 200
+    assert "lists" in board_resp.json() and "tasks" in board_resp.json()
+
+    deleted_resp = client.get(f"/api/projects/{project_id}/tasks/deleted", headers=owner["headers"])
+    assert deleted_resp.status_code == 200
+    assert isinstance(deleted_resp.json(), list)
+
+    # Non-admin cannot access /api/admin/users
+    assert client.get("/api/admin/users", headers=owner["headers"]).status_code == 403
+
+

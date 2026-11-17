@@ -15,9 +15,13 @@ _INSECURE_DEFAULT_DB_PASSWORDS = {
 }
 
 
+_BACKEND_DIR = Path(__file__).resolve().parents[2]
+_ROOT_DIR = _BACKEND_DIR.parent
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(str(_ROOT_DIR / ".env"), str(_BACKEND_DIR / ".env"), ".env"),
         env_file_encoding="utf-8",
         extra="ignore"
     )
