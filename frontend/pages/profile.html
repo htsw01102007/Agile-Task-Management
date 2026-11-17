@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hồ sơ cá nhân | Agile Workspace</title>
+  <link rel="icon" href="../assets/images/logo.svg"><link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../">
+  <div id="app"><header id="app-header" class="hdr"></header><aside id="app-sidebar" class="side"></aside>
+    <main class="page-content">
+      <div class="crumb"><a href="../index.html">Không gian làm việc</a><span>›</span><span>Hồ sơ</span></div>
+      <div class="page-heading"><div><p class="eyebrow">TÀI KHOẢN</p><h1>Hồ sơ cá nhân</h1><p class="muted">Thông tin tài khoản đang đăng nhập.</p></div></div>
+      <section class="content-panel profile-panel">
+        <div class="profile-heading"><span id="profile-avatar" class="profile-avatar">?</span><div><h2 id="profile-name-heading">Đang tải hồ sơ…</h2><span id="profile-role" class="role-badge"></span></div></div>
+        <form id="profile-form" class="profile-form" hidden>
+          <label for="profile-full-name">Họ và tên</label><input id="profile-full-name" name="full_name" maxlength="150" required>
+          <label for="profile-email">Gmail / Email</label><input id="profile-email" name="email" type="email" readonly aria-describedby="email-note">
+          <small id="email-note" class="muted">Email dùng để đăng nhập và nhận lời mời; hiện chưa hỗ trợ đổi email.</small>
+          <label for="profile-username">Tên đăng nhập</label><input id="profile-username" name="username" readonly>
+          <button id="profile-save" class="btn btn-primary" type="submit">Lưu họ tên</button>
+        </form>
+        <p id="profile-error" class="status status-error" hidden></p>
+      </section>
+      <section class="content-panel profile-panel" style="margin-top: 20px;">
+        <h2>Đổi mật khẩu</h2>
+        <p class="muted">Cập nhật mật khẩu đăng nhập tài khoản của bạn.</p>
+        <form id="password-form" class="profile-form">
+          <label for="current-password">Mật khẩu hiện tại</label>
+          <input id="current-password" name="current_password" type="password" autocomplete="current-password" required>
+          <label for="new-password">Mật khẩu mới</label>
+          <input id="new-password" name="new_password" type="password" minlength="8" autocomplete="new-password" required>
+          <small class="muted">Tối thiểu 8 ký tự, gồm chữ hoa, chữ thường và chữ số.</small>
+          <button id="password-save" class="btn btn-primary" type="submit">Đổi mật khẩu</button>
+        </form>
+      </section>
+    </main>
+  </div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script><script src="../js/config.js"></script><script src="../js/api.js"></script><script src="../js/utils.js"></script><script src="../js/layout.js"></script><script src="../js/pages/profile.js"></script>
+</body>
+</html>

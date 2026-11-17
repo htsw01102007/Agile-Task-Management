@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Việc của tôi | Agile Workspace</title>
+  <link rel="icon" href="../assets/images/logo.svg"><link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../">
+  <div id="app"><header id="app-header" class="hdr"></header><aside id="app-sidebar" class="side"></aside>
+    <main class="page-content">
+      <div class="crumb"><a href="../index.html">Không gian làm việc</a><span>›</span><span>Việc của tôi</span></div>
+      <div class="page-heading"><div><p class="eyebrow">CÔNG VIỆC</p><h1>Việc của tôi</h1><p class="muted">Các công việc được giao cho bạn trong mọi dự án.</p></div><button id="check-backend" class="btn" type="button">Kiểm tra backend</button></div>
+      <section class="content-panel">
+        <form id="task-filters" class="table-filters">
+          <input name="search" type="search" placeholder="Tìm công việc" aria-label="Tìm công việc">
+          <select name="priority" aria-label="Lọc độ ưu tiên"><option value="">Mọi ưu tiên</option><option value="urgent">Khẩn</option><option value="high">Cao</option><option value="medium">Trung bình</option><option value="low">Thấp</option></select>
+          <select name="is_completed" aria-label="Lọc trạng thái"><option value="">Mọi trạng thái</option><option value="false">Chưa hoàn thành</option><option value="true">Hoàn thành</option></select>
+          <select name="is_overdue" aria-label="Lọc hạn chót"><option value="">Mọi hạn chót</option><option value="true">Quá hạn</option><option value="false">Chưa quá hạn</option></select>
+          <button class="btn" type="submit">Lọc</button>
+        </form>
+        <p id="backend-health-result" class="muted" role="status" hidden></p>
+        <div id="my-task-list" class="my-task-list" aria-live="polite"><p class="muted">Đang tải công việc…</p></div>
+        <div class="pagination"><button id="task-prev" class="btn" type="button">Trước</button><span id="task-page">Trang 1</span><button id="task-next" class="btn" type="button">Sau</button></div>
+      </section>
+    </main>
+  </div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script><script src="../js/config.js"></script><script src="../js/api.js"></script><script src="../js/utils.js"></script><script src="../js/layout.js"></script><script src="../js/pages/my-tasks.js"></script>
+</body>
+</html>

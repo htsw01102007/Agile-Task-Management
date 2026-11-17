@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quản lý người dùng | Agile Workspace</title>
+  <link rel="icon" href="../assets/images/logo.svg"><link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../">
+  <div id="app"><header id="app-header" class="hdr"></header><aside id="app-sidebar" class="side"></aside>
+    <main class="page-content">
+      <div class="crumb"><a href="../index.html">Không gian làm việc</a><span>›</span><span>Quản trị người dùng</span></div>
+      <div class="page-heading"><div><p class="eyebrow">QUẢN TRỊ HỆ THỐNG</p><h1>Người dùng</h1><p class="muted">Tạo, tra cứu, sửa hồ sơ và khóa hoặc mở khóa tài khoản.</p></div><button id="create-user-toggle" class="btn btn-primary" type="button" hidden>＋ Tạo tài khoản</button></div>
+      <section id="admin-profile-card" class="content-panel admin-profile-card" aria-label="Thông tin quản trị viên">
+        <span id="admin-profile-avatar" class="avatar">A</span>
+        <div><p class="eyebrow">ĐANG ĐĂNG NHẬP VỚI QUYỀN ADMIN</p><h2 id="admin-profile-name">Đang tải hồ sơ…</h2><p id="admin-profile-email" class="muted"></p></div>
+        <a class="btn" href="profile.html">Xem hồ sơ</a>
+      </section>
+      <section id="create-user-panel" class="content-panel" hidden>
+        <h2>Tạo tài khoản thành viên</h2>
+        <form id="create-user-form" class="table-filters">
+          <input name="full_name" required maxlength="150" placeholder="Họ và tên" aria-label="Họ và tên">
+          <input name="email" type="email" required maxlength="255" placeholder="Email" aria-label="Email">
+          <input name="username" required minlength="3" maxlength="50" pattern="[A-Za-z0-9_]+" placeholder="Tên đăng nhập" aria-label="Tên đăng nhập">
+          <input name="password" type="password" required minlength="8" placeholder="Mật khẩu: chữ hoa, chữ thường, số" aria-label="Mật khẩu">
+          <button class="btn btn-primary" type="submit">Tạo</button>
+          <button id="create-user-cancel" class="btn" type="button">Hủy</button>
+        </form>
+      </section>
+      <section class="content-panel">
+        <form id="user-filters" class="table-filters">
+          <input name="q" type="search" placeholder="Tìm email, họ tên hoặc tên đăng nhập" aria-label="Tìm người dùng">
+          <select name="is_active" aria-label="Lọc trạng thái"><option value="">Mọi trạng thái</option><option value="true">Đang hoạt động</option><option value="false">Đã khóa</option></select>
+          <button class="btn" type="submit">Lọc</button>
+        </form>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>Tài khoản</th><th>Vai trò</th><th>Trạng thái</th><th>Đăng nhập gần nhất</th><th>Thao tác</th></tr></thead><tbody id="users-body"><tr><td colspan="5">Đang tải…</td></tr></tbody></table></div>
+        <div class="pagination"><button id="users-prev" class="btn" type="button">Trước</button><span id="users-page">Trang 1</span><button id="users-next" class="btn" type="button">Sau</button></div>
+      </section>
+    </main>
+  </div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script><script src="../js/config.js"></script><script src="../js/api.js"></script><script src="../js/utils.js"></script><script src="../js/layout.js"></script><script src="../js/pages/admin-users.js"></script>
+</body>
+</html>

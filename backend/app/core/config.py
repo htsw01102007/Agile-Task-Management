@@ -3,15 +3,15 @@ from urllib.parse import quote_plus
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# Chỉ chứa placeholder chung chung, KHÔNG nhúng secret thật vào code
 _INSECURE_DEFAULT_SECRETS = {
     "",
     "super-secret-key",
     "changeme",
-    "37da485fb46bad455e73ea0f2e2594ceedb41fb57dc221bfc4314288de3a22e4",
 }
 _INSECURE_DEFAULT_DB_PASSWORDS = {
     "",
-    "Minh01052007.",
+    "changeme",
 }
 
 
@@ -25,15 +25,15 @@ class Settings(BaseSettings):
     APP_NAME: str = "Task Project Management API"
     ENV: str = "development"
 
-    # MySQL Database credentials
+    # MySQL Database credentials — mật khẩu thật đặt trong .env (gitignored)
     DB_HOST: str = "127.0.0.1"
     DB_PORT: int = 3306
     DB_USER: str = "root"
-    DB_PASSWORD: str = "Minh01052007."
+    DB_PASSWORD: str = ""
     DB_NAME: str = "task_project_management"
 
-    # JWT Security
-    SECRET_KEY: str = "37da485fb46bad455e73ea0f2e2594ceedb41fb57dc221bfc4314288de3a22e4"
+    # JWT Security — SECRET_KEY thật đặt trong .env (gitignored)
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7

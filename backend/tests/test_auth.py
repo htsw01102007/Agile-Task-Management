@@ -104,7 +104,7 @@ def test_production_settings_validation_blocks_defaults():
     insecure = Settings(
         ENV="production",
         SECRET_KEY="super-secret-key",
-        DB_PASSWORD="Minh01052007.",
+        DB_PASSWORD="changeme",
         CORS_ORIGINS="*",
     )
     with pytest.raises(RuntimeError):
