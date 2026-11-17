@@ -11,16 +11,6 @@ from app.crud.auth import (
     change_user_password,
     authenticate_google_user,
 )
-from app.crud.project import (
-    query_active_projects,
-    get_active_project_by_id,
-    create_project_with_owner,
-    transfer_project_ownership,
-    hash_invitation_token,
-    generate_invitation_token_pair,
-    create_project_invitation,
-    find_invitation_by_token,
-)
 
 __all__ = [
     "to_user_out",
@@ -34,12 +24,5 @@ __all__ = [
     "update_user_profile",
     "change_user_password",
     "authenticate_google_user",
-    "query_active_projects",
-    "get_active_project_by_id",
-    "create_project_with_owner",
-    "transfer_project_ownership",
-    "hash_invitation_token",
-    "generate_invitation_token_pair",
-    "create_project_invitation",
-    "find_invitation_by_token",
 ]
+

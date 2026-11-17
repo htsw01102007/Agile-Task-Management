@@ -164,6 +164,12 @@ def get_task_for_restore(
             detail="Chỉ Owner hoặc Manager mới có quyền khôi phục công việc đã xoá",
         )
 
+    if project.status in ["completed", "archived"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Dự án đang ở trạng thái '{project.status}' (chỉ đọc), không thể thực hiện thao tác này",
+        )
+
     task = (
         db.query(Task)
         .filter(Task.id == task_id, Task.project_id == project_id, Task.is_deleted.is_(True))

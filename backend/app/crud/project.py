@@ -1,8 +1,11 @@
+import json
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 from fastapi import HTTPException, status
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, Query
 
 from app.models.user import User
@@ -125,8 +128,8 @@ def transfer_project_ownership(
                 entity_type="project",
                 entity_id=project.id,
                 action="ownership_transferred",
-                old_value=f'{{"owner_id": {old_owner_id}}}',
-                new_value=f'{{"owner_id": {new_owner_id}}}',
+                old_value=json.dumps({"owner_id": old_owner_id}),
+                new_value=json.dumps({"owner_id": new_owner_id}),
             )
         )
         db.commit()
@@ -173,8 +176,11 @@ def create_project_invitation(
 
     normalized_email = invitation_in.invitee_email.strip().lower()
 
+    # Khoá dòng project để tuần tự hoá các yêu cầu mời đồng thời vào cùng dự án
+    db.query(Project.id).filter(Project.id == project.id).with_for_update().first()
+
     # 1. Kiểm tra nếu email đã là thành viên trong dự án
-    existing_user = db.query(User).filter(User.email == normalized_email).first()
+    existing_user = db.query(User).filter(func.lower(User.email) == normalized_email).first()
     if existing_user:
         is_member = (
             db.query(ProjectMember)
@@ -191,12 +197,12 @@ def create_project_invitation(
             )
 
     # 2. Chống mời trùng: Kiểm tra trong service xem đã có lời mời pending cho email này chưa
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     pending_invitations = (
         db.query(ProjectInvitation)
         .filter(
             ProjectInvitation.project_id == project.id,
-            ProjectInvitation.invitee_email == normalized_email,
+            func.lower(ProjectInvitation.invitee_email) == normalized_email,
             ProjectInvitation.status == "pending",
         )
         .all()
@@ -209,6 +215,8 @@ def create_project_invitation(
             )
         else:
             pending_inv.status = "expired"
+    # Ghi trạng thái 'expired' trước khi INSERT lời mời mới (tránh vướng ràng buộc UNIQUE pending)
+    db.flush()
 
     # 3. Sinh raw_token (để gửi email) và lưu bản băm SHA-256 hex (64 ký tự) vào DB
     raw_token, token_hash = generate_invitation_token_pair()
@@ -225,7 +233,14 @@ def create_project_invitation(
         expires_at=expires_at,
     )
     db.add(invitation)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Đã có lời mời đang chờ phản hồi (pending) cho email này trong dự án",
+        )
 
     if existing_user:
         db.add(
@@ -247,7 +262,7 @@ def create_project_invitation(
             entity_type="invitation",
             entity_id=invitation.id,
             action="created",
-            new_value=f'{{"invitee_email": "{normalized_email}", "role": "{invitation_in.role}"}}',
+            new_value=json.dumps({"invitee_email": normalized_email, "role": invitation_in.role}, ensure_ascii=False),
         )
     )
 
@@ -266,3 +281,4 @@ def find_invitation_by_token(db: Session, token_input: str) -> Optional[ProjectI
     if not invitation and len(token_input) == 64:
         invitation = db.query(ProjectInvitation).filter(ProjectInvitation.token == token_input).first()
     return invitation
+

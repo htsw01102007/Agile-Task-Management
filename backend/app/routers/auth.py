@@ -1,3 +1,4 @@
+from __future__ import annotations
 from urllib.parse import quote_plus
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import RedirectResponse
@@ -6,7 +7,7 @@ from authlib.integrations.starlette_client import OAuth
 from authlib.integrations.base_client.errors import OAuthError
 
 from app.db.session import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, oauth2_scheme
 from app.core.config import settings
 from app.schemas.auth import (
     RegisterRequest,
@@ -14,6 +15,7 @@ from app.schemas.auth import (
     UserOut,
     TokenResponse,
     RefreshRequest,
+    LogoutRequest,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     ResetPasswordRequest,
@@ -37,6 +39,22 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     """Đăng nhập bằng Email hoặc Username + Mật khẩu. Trả về access_token + refresh_token."""
     return auth_crud.authenticate_user(db, body)
+
+
+@router.post("/logout", response_model=MessageResponse, summary="Đăng xuất và thu hồi access/refresh token")
+def logout(
+    body: LogoutRequest | None = None,
+    token: str = Depends(oauth2_scheme),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Thu hồi access_token và refresh_token của phiên hiện tại ngay lập tức."""
+    return auth_crud.logout_user(
+        db,
+        token,
+        refresh_token_str=body.refresh_token if body else None,
+        user_id=current_user.id,
+    )
 
 
 # ── 2. Làm mới Token ──────────────────────────────────────

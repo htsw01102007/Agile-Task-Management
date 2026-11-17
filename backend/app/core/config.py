@@ -1,42 +1,57 @@
-"""Đọc cấu hình từ file .env (hoặc biến môi trường).
-
-Muốn thêm cấu hình mới: thêm 1 dòng vào class Settings + thêm vào .env.example.
-"""
+from pathlib import Path
 from urllib.parse import quote_plus
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+# Chỉ chứa placeholder chung chung, KHÔNG nhúng secret thật vào code
+_INSECURE_DEFAULT_SECRETS = {
+    "",
+    "super-secret-key",
+    "changeme",
+}
+_INSECURE_DEFAULT_DB_PASSWORDS = {
+    "",
+    "changeme",
+}
 
-    APP_NAME: str = "Agile Task Management API"
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+    APP_NAME: str = "Task Project Management API"
     ENV: str = "development"
 
+    # MySQL Database credentials — mật khẩu thật đặt trong .env (gitignored)
     DB_HOST: str = "127.0.0.1"
     DB_PORT: int = 3306
     DB_USER: str = "root"
     DB_PASSWORD: str = ""
-    DB_NAME: str = "agile_task_management"
+    DB_NAME: str = "task_project_management"
 
-    SECRET_KEY: str = "37da485fb46bad455e73ea0f2e2594ceedb41fb57dc221bfc4314288de3a22e4"
+    # JWT Security — SECRET_KEY thật đặt trong .env (gitignored)
+    SECRET_KEY: str = ""
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     PASSWORD_RESET_EXPIRE_MINUTES: int = 30
 
-    FRONTEND_URL: str = "http://127.0.0.1:5500"
+    # Google OAuth2
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_REDIRECT_URI: str = "http://127.0.0.1:8000/api/auth/google/callback"
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/auth/google/callback"
 
-    # Chuỗi các origin cách nhau bằng dấu phẩy, hoặc "*"
+    # Frontend / CORS
+    FRONTEND_URL: str = "http://localhost:5173"
     CORS_ORIGINS: str = "*"
+    UPLOAD_DIR: str = str(Path(__file__).resolve().parents[2] / "uploads")
 
     @property
     def database_url(self) -> str:
-        # mysql+pymysql://user:password@host:port/database
-        # quote_plus: để mật khẩu có ký tự đặc biệt (@, #, /...) không làm hỏng URL
+        # mysql+pymysql://user:password@host:port/database?charset=utf8mb4
         return (
             f"mysql+pymysql://{self.DB_USER}:{quote_plus(self.DB_PASSWORD)}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset=utf8mb4"
@@ -44,7 +59,33 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        if self.CORS_ORIGINS == "*":
+            return ["*"]
+        origins = [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        if self.FRONTEND_URL not in origins and self.FRONTEND_URL:
+            origins.append(self.FRONTEND_URL)
+        return origins
+
+    @property
+    def cors_allow_credentials(self) -> bool:
+        return self.cors_origin_list != ["*"]
+
+    def validate_production_settings(self) -> None:
+        """Chặn khởi động ở môi trường production nếu còn cấu hình mặc định không an toàn."""
+        if self.ENV.strip().lower() != "production":
+            return
+
+        errors: list[str] = []
+        if self.SECRET_KEY.strip() in _INSECURE_DEFAULT_SECRETS or len(self.SECRET_KEY.strip()) < 32:
+            errors.append("SECRET_KEY phải được cấu hình riêng (>= 32 ký tự) ở môi trường production")
+        if self.DB_PASSWORD in _INSECURE_DEFAULT_DB_PASSWORDS:
+            errors.append("DB_PASSWORD không được để trống hoặc dùng mật khẩu mặc định ở môi trường production")
+        if self.CORS_ORIGINS.strip() == "*" or "*" in self.cors_origin_list:
+            errors.append("CORS_ORIGINS không được dùng '*' ở môi trường production")
+
+        if errors:
+            raise RuntimeError("Cấu hình production không an toàn: " + "; ".join(errors))
 
 
 settings = Settings()
+

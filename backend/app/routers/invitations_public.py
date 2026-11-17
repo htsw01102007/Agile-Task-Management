@@ -1,11 +1,15 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.db.session import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
+from app.models.project import Project
 from app.models.project_invitation import ProjectInvitation
 from app.models.project_member import ProjectMember
 from app.models.notification import Notification
@@ -22,10 +26,14 @@ def list_my_invitations(
     current_user: User = Depends(get_current_user),
 ):
     """Danh sách các lời mời tham gia dự án gửi tới email của người dùng hiện tại"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     invitations = (
         db.query(ProjectInvitation)
-        .filter(ProjectInvitation.invitee_email == current_user.email)
+        .join(Project, Project.id == ProjectInvitation.project_id)
+        .filter(
+            func.lower(ProjectInvitation.invitee_email) == current_user.email.lower(),
+            Project.deleted_at.is_(None),
+        )
         .order_by(ProjectInvitation.created_at.desc())
         .all()
     )
@@ -48,9 +56,17 @@ def accept_invitation(
     invitation = find_invitation_by_token(db, token)
     if not invitation:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lời mời không tồn tại")
+    # Khoá dòng lời mời: 2 request chấp nhận đồng thời sẽ được xử lý tuần tự
+    invitation = (
+        db.query(ProjectInvitation)
+        .filter(ProjectInvitation.id == invitation.id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if invitation.status != "pending":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời không còn hiệu lực")
-    if invitation.expires_at < datetime.utcnow():
+    if invitation.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         invitation.status = "expired"
         db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời đã hết hạn")
@@ -58,6 +74,11 @@ def accept_invitation(
     project = get_active_project_by_id(db, invitation.project_id)
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dự án không tồn tại hoặc đã bị xoá")
+    if project.status in ("completed", "archived"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Dự án đang ở trạng thái '{project.status}' (chỉ đọc), không thể chấp nhận lời mời lúc này",
+        )
 
     if invitation.invitee_email.lower() != current_user.email.lower():
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Lời mời này không dành cho bạn")
@@ -79,7 +100,7 @@ def accept_invitation(
 
     invitation.status = "accepted"
     invitation.invitee_id = current_user.id
-    invitation.responded_at = datetime.utcnow()
+    invitation.responded_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     if invitation.inviter_id is not None:
         db.add(
@@ -100,15 +121,17 @@ def accept_invitation(
             entity_type="member",
             entity_id=current_user.id,
             action="joined",
-            new_value=f'{{"user_id": {current_user.id}, "role": "{invitation.role}"}}',
+            new_value=json.dumps({"user_id": current_user.id, "role": invitation.role}, ensure_ascii=False),
         )
     )
 
-    db.commit()
-    return {
-        "message": "Đã chấp nhận lời mời tham gia dự án",
-        "project_id": invitation.project_id,
-    }
+    try:
+        db.commit()
+    except IntegrityError:
+        # Thêm project_members và cập nhật lời mời nằm trong cùng transaction -> rollback cả hai
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bạn đã là thành viên của dự án")
+    return {"message": "Đã chấp nhận lời mời tham gia dự án"}
 
 
 @router.post("/decline/{token}")
@@ -122,7 +145,7 @@ def decline_invitation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lời mời không tồn tại")
     if invitation.status != "pending":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời không còn hiệu lực")
-    if invitation.expires_at < datetime.utcnow():
+    if invitation.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         invitation.status = "expired"
         db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời đã hết hạn")
@@ -133,7 +156,7 @@ def decline_invitation(
 
     invitation.status = "declined"
     invitation.invitee_id = current_user.id
-    invitation.responded_at = datetime.utcnow()
+    invitation.responded_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     if invitation.inviter_id is not None:
         db.add(
