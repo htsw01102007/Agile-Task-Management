@@ -3,8 +3,8 @@ const loginSubmit = document.getElementById("login-submit");
 
 function redirectAfterLogin() {
   const requestedPath = new URLSearchParams(window.location.search).get("next");
-  if (requestedPath) {
-    const destination = new URL(requestedPath, window.location.origin);
+  if (requestedPath && requestedPath !== "/index.html" && requestedPath !== "index.html") {
+    const destination = new URL(requestedPath, window.location.href);
     if (destination.origin === window.location.origin) {
       window.location.assign(`${destination.pathname}${destination.search}${destination.hash}`);
       return;

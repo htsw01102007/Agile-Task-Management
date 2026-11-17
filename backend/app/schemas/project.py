@@ -1,6 +1,8 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
+from app.schemas.list import ListResponse
+from app.schemas.task import TaskDetailResponse
 
 
 class ProjectCreate(BaseModel):
@@ -46,3 +48,14 @@ class ProjectDetailResponse(ProjectResponse):
 
     completed_task_count: int = 0
     completion_rate: float = 0.0
+
+
+class ProjectDashboardSummaryResponse(BaseModel):
+    active_project_count: int = 0
+    pending_task_count: int = 0
+    completed_task_count: int = 0
+
+
+class ProjectBoardResponse(BaseModel):
+    lists: List[ListResponse] = []
+    tasks: List[TaskDetailResponse] = []

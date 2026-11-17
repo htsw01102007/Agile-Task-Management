@@ -127,7 +127,9 @@ def _is_invalid_client_config(client_id: str, client_secret: str) -> bool:
 async def google_login(request: Request):
     if _is_invalid_client_config(settings.GOOGLE_CLIENT_ID, settings.GOOGLE_CLIENT_SECRET):
         error_msg = "Google OAuth2 chưa được cấu hình Client ID và Secret hợp lệ trong file .env."
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?error={quote_plus(error_msg)}")
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/pages/login.html?error={quote_plus(error_msg)}"
+        )
 
     redirect_uri = settings.GOOGLE_REDIRECT_URI
     return await oauth.google.authorize_redirect(
@@ -173,15 +175,24 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         )
 
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/oauth/callback#access_token={token_response.access_token}&refresh_token={token_response.refresh_token}"
+            url=(
+                f"{settings.FRONTEND_URL}/pages/oauth-callback.html"
+                f"#access_token={token_response.access_token}&refresh_token={token_response.refresh_token}"
+            )
         )
 
     except HTTPException as e:
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/oauth/callback?error={quote_plus(str(e.detail))}")
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/pages/oauth-callback.html?error={quote_plus(str(e.detail))}"
+        )
     except OAuthError as e:
         error_msg = f"Lỗi xác thực Google: {e.description if hasattr(e, 'description') and e.description else str(e)}"
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/oauth/callback?error={quote_plus(error_msg)}")
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/pages/oauth-callback.html?error={quote_plus(error_msg)}"
+        )
     except Exception as e:
         error_msg = f"Đăng nhập Google thất bại: {str(e)}"
-        return RedirectResponse(url=f"{settings.FRONTEND_URL}/oauth/callback?error={quote_plus(error_msg)}")
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/pages/oauth-callback.html?error={quote_plus(error_msg)}"
+        )
 

@@ -5,6 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tổng quan | Agile Workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="icon" href="assets/images/logo.svg">
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -13,98 +15,143 @@
   <div id="app">
     <header id="app-header" class="hdr"></header>
     <aside id="app-sidebar" class="side"></aside>
+
     <main class="page-content" id="main-content">
-      <div class="crumb">Không gian làm việc <span>›</span> Tổng quan</div>
+      <nav class="crumb" aria-label="Breadcrumb">
+        <span>Không gian làm việc</span>
+        <span>›</span>
+        <span>Tổng quan</span>
+      </nav>
+
       <div class="page-heading">
         <div>
           <p id="dashboard-date" class="eyebrow"></p>
           <h1 id="dashboard-greeting">Tổng quan công việc</h1>
-          <p class="muted">Các dự án và công việc trong không gian làm việc của bạn.</p>
-        </div><button id="create-project-button" class="btn btn-primary" type="button" hidden>＋ Tạo dự án</button>
+          <p class="muted">Theo dõi tiến độ các dự án và công việc trong không gian làm việc của bạn.</p>
+        </div>
+        <button id="create-project-button" class="btn btn-primary" type="button" hidden>
+          ＋ Tạo dự án mới
+        </button>
       </div>
-      <section id="dashboard-auth-prompt" class="auth-prompt" hidden><span class="mark">A</span>
-        <h2>Đăng nhập để xem không gian làm việc</h2>
-        <p class="muted">Số liệu, dự án và công việc chỉ hiển thị sau khi bạn đăng nhập.</p>
-        <div><a class="btn btn-primary" href="pages/login.html?next=%2Findex.html">Đăng nhập</a><a class="btn"
-            href="pages/register.html">Tạo tài khoản</a></div>
+
+      <section id="dashboard-auth-prompt" class="auth-prompt" hidden>
+        <span class="mark">A</span>
+        <h2>Đăng nhập vào Agile Workspace</h2>
+        <p class="muted">Số liệu thống kê, bảng Kanban và công việc được cá nhân hóa sau khi bạn đăng nhập.</p>
+        <div>
+          <a class="btn btn-primary" href="pages/login.html">Đăng nhập</a>
+          <a class="btn" href="pages/register.html">Tạo tài khoản</a>
+        </div>
       </section>
+
       <div id="dashboard-content" hidden>
+        <!-- Khối thống kê dành riêng cho Quản trị viên hệ thống -->
         <section id="admin-overview" class="admin-overview" hidden aria-label="Tổng quan hệ thống">
           <div class="panel-heading">
             <div>
               <p class="eyebrow">QUẢN TRỊ HỆ THỐNG</p>
-              <h2>Tổng quan hệ thống</h2>
-              <p class="muted">Dữ liệu tổng hợp toàn bộ thành viên, dự án và công việc.</p>
-            </div><a class="btn" href="pages/admin-users.html">Quản lý người dùng</a>
+              <h2>Toàn cảnh không gian làm việc</h2>
+              <p class="muted">Dữ liệu tổng hợp toàn bộ thành viên, dự án và công việc trên hệ thống.</p>
+            </div>
+            <a class="btn" href="pages/admin-users.html">Quản lý người dùng →</a>
           </div>
+
           <div class="overview-grid">
-            <article class="metric-card"><span class="metric-icon teal">♙</span>
+            <article class="metric-card">
+              <span class="metric-icon teal">♙</span>
               <div>
-                <p class="metric-label">Tổng tài khoản</p><strong id="admin-metric-users">—</strong>
-              </div><span id="admin-metric-active-users" class="metric-note">đang hoạt động</span>
+                <p class="metric-label">Tổng tài khoản</p>
+                <strong id="admin-metric-users">—</strong>
+              </div>
+              <span id="admin-metric-active-users" class="metric-note">đang hoạt động</span>
             </article>
-            <article class="metric-card"><span class="metric-icon amber">▦</span>
+
+            <article class="metric-card">
+              <span class="metric-icon amber">▦</span>
               <div>
-                <p class="metric-label">Dự án</p><strong id="admin-metric-projects">—</strong>
-              </div><span id="admin-metric-active-projects" class="metric-note">đang hoạt động</span>
+                <p class="metric-label">Tổng dự án</p>
+                <strong id="admin-metric-projects">—</strong>
+              </div>
+              <span id="admin-metric-active-projects" class="metric-note">đang hoạt động</span>
             </article>
-            <article class="metric-card"><span class="metric-icon violet">✓</span>
+
+            <article class="metric-card">
+              <span class="metric-icon violet">✓</span>
               <div>
-                <p class="metric-label">Tổng công việc</p><strong id="admin-metric-tasks">—</strong>
-              </div><span id="admin-metric-completed-tasks" class="metric-note">đã hoàn thành</span>
+                <p class="metric-label">Tổng công việc</p>
+                <strong id="admin-metric-tasks">—</strong>
+              </div>
+              <span id="admin-metric-completed-tasks" class="metric-note">đã hoàn thành</span>
             </article>
           </div>
+
           <section class="content-panel admin-recent-users">
             <div class="panel-heading">
               <div>
-                <h2>Tài khoản mới</h2>
-                <p class="muted">5 tài khoản đăng ký gần đây nhất.</p>
+                <h2>Tài khoản đăng ký gần đây</h2>
+                <p class="muted">5 thành viên mới nhất vừa gia nhập hệ thống.</p>
               </div>
             </div>
             <div class="table-wrap">
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>Họ tên</th>
+                    <th>Thành viên</th>
                     <th>Email</th>
                     <th>Vai trò</th>
                     <th>Trạng thái</th>
-                    <th>Ngày tạo</th>
+                    <th>Ngày tham gia</th>
                   </tr>
                 </thead>
                 <tbody id="admin-recent-users">
                   <tr>
-                    <td colspan="5">Đang tải…</td>
+                    <td colspan="5" class="muted">Đang tải dữ liệu…</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </section>
         </section>
+
+        <!-- Số liệu cá nhân -->
         <section class="overview-grid" aria-label="Tổng quan công việc">
-          <article class="metric-card"><span class="metric-icon teal">▦</span>
+          <article class="metric-card">
+            <span class="metric-icon teal">▦</span>
             <div>
-              <p class="metric-label">Dự án đang hoạt động</p><strong id="metric-projects">—</strong>
-            </div><span class="metric-note">dự án bạn tham gia</span>
+              <p class="metric-label">Dự án đang hoạt động</p>
+              <strong id="metric-projects">—</strong>
+            </div>
+            <span class="metric-note">dự án bạn tham gia</span>
           </article>
-          <article class="metric-card"><span class="metric-icon amber">◷</span>
+
+          <article class="metric-card">
+            <span class="metric-icon amber">◷</span>
             <div>
-              <p class="metric-label">Việc đang thực hiện</p><strong id="metric-pending">—</strong>
-            </div><span class="metric-note">được giao cho bạn</span>
+              <p class="metric-label">Việc đang thực hiện</p>
+              <strong id="metric-pending">—</strong>
+            </div>
+            <span class="metric-note">được giao cho bạn</span>
           </article>
-          <article class="metric-card"><span class="metric-icon violet">✓</span>
+
+          <article class="metric-card">
+            <span class="metric-icon violet">✓</span>
             <div>
-              <p class="metric-label">Việc đã hoàn thành</p><strong id="metric-completed">—</strong>
-            </div><span class="metric-note">được giao cho bạn</span>
+              <p class="metric-label">Việc đã hoàn thành</p>
+              <strong id="metric-completed">—</strong>
+            </div>
+            <span class="metric-note">được giao cho bạn</span>
           </article>
         </section>
+
+        <!-- Danh sách dự án -->
         <section class="content-panel">
           <div class="panel-heading">
             <div>
               <h2>Dự án của bạn</h2>
-              <p class="muted">Dữ liệu lấy từ các dự án bạn là thành viên.</p>
-            </div><label class="sr-only" for="project-status-filter">Lọc trạng thái dự án</label><select
-              id="project-status-filter" class="filter-select">
+              <p class="muted">Truy cập nhanh vào bảng Kanban của từng dự án bạn đang tham gia.</p>
+            </div>
+            <label class="sr-only" for="project-status-filter">Lọc trạng thái dự án</label>
+            <select id="project-status-filter" class="filter-select">
               <option value="">Mọi trạng thái</option>
               <option value="active">Đang hoạt động</option>
               <option value="completed">Hoàn thành</option>
@@ -114,36 +161,53 @@
           <div id="project-cards" class="project-cards" aria-live="polite"></div>
         </section>
       </div>
+
+      <!-- Hộp thoại Tạo / Chỉnh sửa dự án -->
       <dialog id="project-dialog" class="app-dialog">
         <form id="project-form" method="dialog" class="dialog-form">
           <div class="dialog-heading">
             <div>
               <p class="eyebrow">KHÔNG GIAN LÀM VIỆC</p>
               <h2 id="project-form-title">Tạo dự án</h2>
-            </div><button class="icon-btn" type="button" data-close-dialog aria-label="Đóng">×</button>
+            </div>
+            <button class="icon-btn" type="button" data-close-dialog aria-label="Đóng">×</button>
           </div>
-          <label for="project-name">Tên dự án *</label><input id="project-name" name="name" maxlength="200" required>
-          <label for="project-description-input">Mô tả</label><textarea id="project-description-input"
-            name="description" rows="3"></textarea>
+
+          <label for="project-name">Tên dự án *</label>
+          <input id="project-name" name="name" maxlength="200" placeholder="VD: Nền tảng Thương mại điện tử v2.0" required>
+
+          <label for="project-description-input">Mô tả mục tiêu</label>
+          <textarea id="project-description-input" name="description" rows="3" placeholder="Tóm tắt phạm vi và mục tiêu chính của dự án…"></textarea>
+
           <div class="form-grid">
-            <div><label for="project-start-date">Ngày bắt đầu</label><input id="project-start-date" name="start_date"
-                type="date"></div>
-            <div><label for="project-end-date">Ngày kết thúc</label><input id="project-end-date" name="end_date"
-                type="date"></div>
+            <div>
+              <label for="project-start-date">Ngày bắt đầu</label>
+              <input id="project-start-date" name="start_date" type="date">
+            </div>
+            <div>
+              <label for="project-end-date">Ngày kết thúc dự kiến</label>
+              <input id="project-end-date" name="end_date" type="date">
+            </div>
           </div>
-          <label id="project-status-label" for="project-status-input" hidden>Trạng thái</label><select
-            id="project-status-input" name="status" hidden>
+
+          <label id="project-status-label" for="project-status-input" hidden>Trạng thái dự án</label>
+          <select id="project-status-input" name="status" hidden>
             <option value="active">Đang hoạt động</option>
             <option value="completed">Hoàn thành</option>
             <option value="archived">Lưu trữ</option>
           </select>
-          <div class="dialog-actions"><button class="btn" type="button" data-close-dialog>Huỷ</button><button
-              id="project-submit" class="btn btn-primary" type="submit">Tạo dự án</button></div>
+
+          <div class="dialog-actions">
+            <button class="btn" type="button" data-close-dialog>Huỷ</button>
+            <button id="project-submit" class="btn btn-primary" type="submit">Tạo dự án</button>
+          </div>
         </form>
       </dialog>
     </main>
   </div>
+
   <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
+
   <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
