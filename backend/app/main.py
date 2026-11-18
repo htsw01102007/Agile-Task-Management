@@ -7,6 +7,7 @@ from sqlalchemy.exc import OperationalError
 from app import models  # noqa: F401
 from app.core.config import settings
 from app.db.session import Base, engine, SessionLocal
+from app.db.migrations import upgrade_notification_schema
 from app.routers import (
     health_router, auth_router,
     project_router, project_members_router,
@@ -23,6 +24,7 @@ from app.core.bootstrap import provision_initial_admin
 async def lifespan(app: FastAPI):
     try:
         Base.metadata.create_all(bind=engine)
+        upgrade_notification_schema(engine)
         print(f"[DB] Connected to MySQL {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
         with SessionLocal() as db:
             if provision_initial_admin(db):

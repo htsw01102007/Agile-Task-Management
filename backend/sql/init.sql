@@ -208,8 +208,11 @@ CREATE TABLE notifications (
     actor_id        BIGINT UNSIGNED NULL,
     project_id      BIGINT UNSIGNED NULL,
     task_id         BIGINT UNSIGNED NULL,
-    type            ENUM('task_assigned', 'task_due_soon', 'task_overdue', 'comment_added', 'mentioned', 'project_invited', 'member_joined', 'task_completed') NOT NULL,
-    message         VARCHAR(500) NOT NULL,
+    type            ENUM('task_created', 'task_assigned', 'task_updated', 'task_moved', 'task_completed', 'task_deleted', 'task_overdue', 'task_due_soon', 'comment_added', 'comment_updated', 'comment_deleted', 'invitation_sent', 'invitation_accepted', 'invitation_declined', 'member_added', 'member_removed', 'member_role_changed', 'project_updated', 'deadline_reminder', 'mentioned', 'project_invited', 'member_joined') NOT NULL,
+    title           VARCHAR(255) NOT NULL DEFAULT '',
+    message         TEXT NULL,
+    entity_type     VARCHAR(50) NULL,
+    entity_id       BIGINT NULL,
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,
     read_at         DATETIME NULL,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -217,7 +220,11 @@ CREATE TABLE notifications (
     CONSTRAINT fk_notif_actor FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE SET NULL,
     CONSTRAINT fk_notif_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
     CONSTRAINT fk_notif_task FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE,
-    INDEX idx_notif_user_read (user_id, is_read, created_at)
+    INDEX idx_notifications_user_read_created (user_id, is_read, created_at),
+    INDEX idx_notifications_type (type),
+    INDEX idx_notifications_entity_id (entity_id),
+    INDEX idx_notifications_project_id (project_id),
+    INDEX idx_notifications_is_read (is_read)
 ) ENGINE=InnoDB;
 
 CREATE TABLE password_reset_tokens (
@@ -402,6 +409,8 @@ INSERT INTO notifications (id, user_id, actor_id, project_id, task_id, type, mes
 (10, 4, 3,    2, NULL, 'project_invited', 'Phạm Thị Lan đã mời bạn tham gia dự án «Ứng dụng Di động Quản lý Chi tiêu».',        TRUE,  '2026-10-03 15:00:00', '2026-10-03 14:30:00'),
 (11, 2, 5,    1, NULL, 'member_joined',   'Vũ Phương Thảo đã tham gia dự án «Xây dựng Website Thương mại điện tử».',            TRUE,  '2026-09-02 10:00:00', '2026-09-02 09:30:00'),
 (12, 2, 5,    3, 21,   'task_completed',  'Vũ Phương Thảo đã hoàn thành công việc «Tổng kết báo cáo chiến dịch».',              TRUE,  '2026-09-29 16:00:00', '2026-09-29 15:00:00');
+
+UPDATE notifications SET title = LEFT(message, 255) WHERE title = '';
  
 INSERT INTO activity_logs (id, project_id, task_id, user_id, entity_type, entity_id, action, old_value, new_value, created_at) VALUES
 (1,  1, NULL, 2, 'project',    1,  'created',          NULL,                                  '{"name": "Xây dựng Website Thương mại điện tử"}',                  '2026-09-01 08:00:00'),
