@@ -83,6 +83,7 @@ def scan_and_create_deadline_notifications(
                 Notification.type == notif_type,
                 Notification.entity_type == "task",
                 Notification.entity_id == task.id,
+                Notification.message == message,
             )
             .first()
         )
@@ -160,24 +161,47 @@ def create_notification(
     current_user: User = Depends(get_current_user),
 ):
     """Tạo thông báo mới cho người dùng (trong dự án hoặc cá nhân)"""
-    if notif_in.project_id is not None:
-        member = (
-            db.query(ProjectMember)
-            .filter(
-                ProjectMember.project_id == notif_in.project_id,
-                ProjectMember.user_id == current_user.id,
-            )
-            .first()
+    if notif_in.project_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ được tạo thông báo trong phạm vi dự án mà bạn quản lý",
         )
-        if not member:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Bạn không phải thành viên của dự án này",
-            )
+
+    project = db.query(Project).filter(Project.id == notif_in.project_id, Project.deleted_at.is_(None)).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dự án không tồn tại")
+
+    member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == notif_in.project_id,
+            ProjectMember.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not member or member.role not in ("owner", "manager"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ Owner hoặc Manager của dự án mới có quyền gửi thông báo",
+        )
 
     target_user = db.query(User).filter(User.id == notif_in.user_id).first()
     if not target_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Người nhận không tồn tại")
+
+    target_member = (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.project_id == notif_in.project_id,
+            ProjectMember.user_id == notif_in.user_id,
+        )
+        .first()
+    )
+    if not target_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Người nhận không phải là thành viên của dự án này",
+        )
 
     notif = Notification(
         user_id=notif_in.user_id,

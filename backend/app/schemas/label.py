@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 class LabelCreate(BaseModel):
@@ -14,10 +14,11 @@ class LabelUpdate(BaseModel):
 
 
 class LabelResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     project_id: int
     name: str
     color: str
     created_at: datetime
+
+    class Config:
+        from_attributes = True

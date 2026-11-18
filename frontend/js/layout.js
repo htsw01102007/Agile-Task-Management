@@ -70,9 +70,16 @@ function renderLayout(projects = [], user = FALLBACK_USER, projectsMessage = "Ch
     const collapsed = app.classList.toggle("collapsed");
     document.querySelector(".sidebar-toggle").setAttribute("aria-expanded", String(!collapsed));
   });
-  document.getElementById("logout-button")?.addEventListener("click", () => {
-    ["access_token", "refresh_token", "token"].forEach((key) => localStorage.removeItem(key));
-    window.location.href = `${root}index.html`;
+  document.getElementById("logout-button")?.addEventListener("click", async () => {
+    const refreshToken = localStorage.getItem("refresh_token");
+    try {
+      await api.post("/auth/logout", { refresh_token: refreshToken });
+    } catch {
+      // Bỏ qua lỗi mạng/token hết hạn khi đăng xuất
+    } finally {
+      ["access_token", "refresh_token", "token"].forEach((key) => localStorage.removeItem(key));
+      window.location.href = `${root}index.html`;
+    }
   });
 
   const bellBtn = document.getElementById("notif-bell-btn");

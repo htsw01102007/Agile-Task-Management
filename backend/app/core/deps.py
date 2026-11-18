@@ -3,7 +3,8 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, get_token_identifier
+from app.models.revoked_token import RevokedToken
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -24,12 +25,22 @@ def get_current_user(
     except ValueError:
         raise unauthorized
 
+    token_id = get_token_identifier(token, payload)
+    check_ids = [token_id]
+    if payload.get("sid"):
+        check_ids.append(str(payload["sid"]))
+    if db.query(RevokedToken.id).filter(RevokedToken.jti.in_(check_ids)).first() is not None:
+        raise unauthorized
+
     user_id = payload.get("user_id")
     if user_id is None:
         raise unauthorized
 
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
+        raise unauthorized
+
+    if payload.get("token_version", 0) != (user.token_version or 0):
         raise unauthorized
 
     if not user.is_active:

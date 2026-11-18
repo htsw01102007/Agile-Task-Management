@@ -1,7 +1,9 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError
 
 from app import models  # noqa: F401
@@ -18,14 +20,67 @@ from app.routers import (
 )
 
 
+def _ensure_schema_migrations() -> None:
+    """Bổ sung idempotent các cột mới nếu bảng đã tồn tại từ schema cũ."""
+    inspector = inspect(engine)
+    if inspector.has_table("users"):
+        user_columns = {col["name"] for col in inspector.get_columns("users")}
+        if "token_version" not in user_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0"))
+
+    if inspector.has_table("project_invitations"):
+        inv_columns = {col["name"] for col in inspector.get_columns("project_invitations")}
+        if "pending_email" not in inv_columns:
+            try:
+                with engine.begin() as conn:
+                    # Đóng các lời mời pending đã quá hạn trước khi thêm ràng buộc UNIQUE
+                    conn.execute(text(
+                        "UPDATE project_invitations SET status = 'expired' "
+                        "WHERE status = 'pending' AND expires_at < UTC_TIMESTAMP()"
+                    ))
+                    conn.execute(text(
+                        "ALTER TABLE project_invitations ADD COLUMN pending_email VARCHAR(255) "
+                        "GENERATED ALWAYS AS (CASE WHEN status = 'pending' "
+                        "THEN LOWER(invitee_email) ELSE NULL END) VIRTUAL"
+                    ))
+                    conn.execute(text(
+                        "ALTER TABLE project_invitations ADD CONSTRAINT uq_invitations_pending "
+                        "UNIQUE (project_id, pending_email)"
+                    ))
+            except Exception as error:  # dữ liệu cũ còn lời mời pending trùng
+                print(f"[DB] Không thể thêm ràng buộc chống mời trùng pending: {error}")
+
+
+settings.validate_production_settings()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    try:
-        Base.metadata.create_all(bind=engine)
-        print(f"[DB] Đã kết nối MySQL {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
-    except OperationalError as error:
+    settings.validate_production_settings()
+    app.state.db_ready = False
+    last_error: OperationalError | None = None
+    max_attempts = 5
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            Base.metadata.create_all(bind=engine)
+            _ensure_schema_migrations()
+            app.state.db_ready = True
+            print(f"[DB] Đã kết nối MySQL {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
+            break
+        except OperationalError as error:
+            last_error = error
+            if attempt < max_attempts:
+                await asyncio.sleep(1)
+
+    if not app.state.db_ready and last_error is not None:
         print("[DB] KHÔNG kết nối được MySQL! Kiểm tra MySQL đã bật chưa và file .env.")
-        print(f"[DB] Chi tiết: {error.orig}")
+        print(f"[DB] Chi tiết: {last_error.orig}")
+        if settings.ENV.strip().lower() == "production":
+            raise RuntimeError("Không thể kết nối MySQL khi khởi động ở môi trường production") from last_error
     yield
 
 
@@ -43,7 +98,7 @@ app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
+    allow_credentials=settings.cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

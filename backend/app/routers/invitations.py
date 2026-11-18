@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.db.session import get_db
 from app.core.permissions import require_project_roles
@@ -40,7 +40,7 @@ def list_invitations(
     data: tuple[Project, ProjectMember] = Depends(require_project_roles("owner", "manager")),
 ):
     project, _ = data
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     invitations = (
         db.query(ProjectInvitation)
         .filter(ProjectInvitation.project_id == project_id)
@@ -78,6 +78,6 @@ def cancel_invitation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lời mời không tồn tại hoặc đã được xử lý")
 
     invitation.status = "cancelled"
-    invitation.responded_at = datetime.utcnow()
+    invitation.responded_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     return None

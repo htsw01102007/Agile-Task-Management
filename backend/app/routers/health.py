@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -17,8 +18,13 @@ def health_check(db: Session = Depends(get_db)):
             "database": "connected",
             "message": "Service is running healthy",
         }
-    except SQLAlchemyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Database connection error: {exc}",
+    except SQLAlchemyError:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unavailable",
+                "database": "disconnected",
+                "message": "Database is not ready",
+            },
         )
+

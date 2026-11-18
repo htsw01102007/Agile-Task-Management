@@ -153,7 +153,7 @@ CREATE TABLE activity_logs (
     CONSTRAINT fk_al_task FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE SET NULL,
     CONSTRAINT fk_al_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL,
     INDEX idx_al_project_created (project_id, created_at),
-    INDEX idx_al_task_created (task_id, created_at),
+    INDEX idx_al_task (task_id),
     INDEX idx_al_entity (entity_type, entity_id)
 ) ENGINE=InnoDB;
 
@@ -190,6 +190,22 @@ CREATE TABLE checklist_items (
     CONSTRAINT fk_ci_task FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE,
     INDEX idx_ci_task_position (task_id, position)
 ) ENGINE=InnoDB;
+
+CREATE VIEW task_checklist_progress AS
+SELECT
+    t.id AS task_id,
+    COUNT(ci.id) AS total_items,
+    COALESCE(SUM(CASE WHEN ci.is_done THEN 1 ELSE 0 END), 0) AS completed_items,
+    CASE
+        WHEN COUNT(ci.id) = 0 THEN 0
+        ELSE ROUND(
+            100 * SUM(CASE WHEN ci.is_done THEN 1 ELSE 0 END) / COUNT(ci.id),
+            0
+        )
+    END AS completion_percent
+FROM tasks AS t
+LEFT JOIN checklist_items AS ci ON ci.task_id = t.id
+GROUP BY t.id;
 
 CREATE TABLE attachments (
     id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

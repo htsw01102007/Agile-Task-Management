@@ -1,7 +1,10 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
+import json
 import os
 
 from app.db.session import get_db
@@ -14,6 +17,7 @@ from app.core.permissions import (
     get_task_for_restore,
     validate_assignees_not_viewers,
 )
+from app.core.config import settings
 from app.core.deps import get_current_user
 from app.core.ws_manager import notify_project_sync, notify_user_sync
 from app.models.user import User
@@ -41,7 +45,7 @@ from app.schemas.checklist import ChecklistItemResponse
 router = APIRouter(prefix="/projects/{project_id}/tasks", tags=["Tasks"])
 my_tasks_router = APIRouter(prefix="/tasks", tags=["My Tasks"])
 
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = settings.UPLOAD_DIR
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -241,9 +245,16 @@ def _query_my_tasks(
 
     query = query.distinct()
 
+    priority_rank = case(
+        (Task.priority == "low", 1),
+        (Task.priority == "medium", 2),
+        (Task.priority == "high", 3),
+        (Task.priority == "urgent", 4),
+        else_=0,
+    )
     sort_col = {
         "due_date": Task.due_date,
-        "priority": Task.priority,
+        "priority": priority_rank,
         "created_at": Task.created_at,
         "position": Task.position,
     }.get(sort_by, Task.due_date)
@@ -359,10 +370,17 @@ def list_tasks(
 
     query = query.distinct()
 
+    priority_rank = case(
+        (Task.priority == "low", 1),
+        (Task.priority == "medium", 2),
+        (Task.priority == "high", 3),
+        (Task.priority == "urgent", 4),
+        else_=0,
+    )
     sort_col = {
         "position": Task.position,
         "due_date": Task.due_date,
-        "priority": Task.priority,
+        "priority": priority_rank,
         "created_at": Task.created_at,
     }.get(sort_by, Task.position)
     query = query.order_by(sort_col.desc() if order == "desc" else sort_col.asc(), Task.id.asc())
@@ -464,7 +482,19 @@ def create_task(
     if task_in.start_date and task_in.due_date and task_in.due_date < task_in.start_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hạn chót không được sớm hơn ngày bắt đầu")
 
-    position = task_in.position if task_in.position is not None else _get_next_position(db, task_in.list_id)
+    if task_in.position is not None:
+        existing_tasks = (
+            db.query(Task)
+            .filter(Task.list_id == task_in.list_id, Task.is_deleted.is_(False))
+            .order_by(Task.position.asc(), Task.id.asc())
+            .all()
+        )
+        position = max(0, min(task_in.position, len(existing_tasks)))
+        for item in existing_tasks:
+            if item.position >= position:
+                item.position += 1
+    else:
+        position = _get_next_position(db, task_in.list_id)
     completed_at = datetime.now(timezone.utc) if list_obj.is_done_column else None
 
     task = Task(
@@ -481,6 +511,8 @@ def create_task(
     )
     db.add(task)
     db.flush()
+    if task_in.position is not None:
+        _renumber_list_tasks(db, task_in.list_id)
 
     notified_users = []
     if task_in.assignee_ids:
@@ -515,7 +547,7 @@ def create_task(
         task.id,
         "created",
         None,
-        f'{{"title": "{task.title}", "priority": "{task.priority}"}}',
+        json.dumps({"title": task.title, "priority": task.priority}, ensure_ascii=False),
     )
 
     db.commit()
@@ -588,12 +620,22 @@ def update_task(
             "task",
             task.id,
             "moved",
-            f'{{"list_id": {old_list_id}, "position": {old_position}}}',
-            f'{{"list_id": {new_list.id}, "position": {task.position}}}',
+            json.dumps({"list_id": old_list_id, "position": old_position}),
+            json.dumps({"list_id": new_list.id, "position": task.position}),
         )
     elif "position" in update_data and update_data["position"] is not None:
-        task.position = update_data["position"]
-        _renumber_list_tasks(db, task.list_id)
+        siblings = (
+            db.query(Task)
+            .filter(Task.list_id == task.list_id, Task.is_deleted.is_(False), Task.id != task.id)
+            .order_by(Task.position.asc(), Task.id.asc())
+            .all()
+        )
+        target_pos = max(0, min(update_data["position"], len(siblings)))
+        siblings.insert(target_pos, task)
+        for idx, item in enumerate(siblings):
+            item.position = idx
+        if task.position != old_position:
+            changes["position"] = {"old": str(old_position), "new": str(task.position)}
 
     if changes:
         _create_activity_log(
@@ -604,8 +646,8 @@ def update_task(
             "task",
             task.id,
             "updated",
-            str({k: v["old"] for k, v in changes.items()}),
-            str({k: v["new"] for k, v in changes.items()}),
+            json.dumps({k: v["old"] for k, v in changes.items()}, ensure_ascii=False),
+            json.dumps({k: v["new"] for k, v in changes.items()}, ensure_ascii=False),
         )
 
     db.commit()
@@ -677,8 +719,8 @@ def move_task(
         "task",
         task.id,
         "moved",
-        f'{{"list_id": {old_list_id}, "position": {old_position}}}',
-        f'{{"list_id": {move_data.list_id}, "position": {task.position}}}',
+        json.dumps({"list_id": old_list_id, "position": old_position}),
+        json.dumps({"list_id": move_data.list_id, "position": task.position}),
     )
 
     db.commit()
@@ -714,12 +756,21 @@ def reorder_tasks(
     if len(list_ids) > 1:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chỉ có thể sắp xếp task trong cùng một danh sách")
 
-    task_map = {t.id: t for t in tasks}
-    ordered_tasks = []
-    for idx, tid in enumerate(reorder.task_ids):
-        t = task_map[tid]
-        t.position = idx
-        ordered_tasks.append(t)
+    target_list_id = next(iter(list_ids))
+    all_list_tasks = (
+        db.query(Task)
+        .filter(Task.list_id == target_list_id, Task.project_id == project_id, Task.is_deleted.is_(False))
+        .order_by(Task.position.asc(), Task.id.asc())
+        .all()
+    )
+    task_map = {t.id: t for t in all_list_tasks}
+    seen_ids = list(dict.fromkeys(reorder.task_ids))
+    ordered_tasks = [task_map[tid] for tid in seen_ids]
+    for item in all_list_tasks:
+        if item.id not in seen_ids:
+            ordered_tasks.append(item)
+    for idx, item in enumerate(ordered_tasks):
+        item.position = idx
 
     db.commit()
     notify_project_sync(
@@ -808,7 +859,7 @@ def assign_task_members(
             task.id,
             "assigned",
             None,
-            f'{{"user_ids": {newly_assigned}}}',
+            json.dumps({"user_ids": newly_assigned}),
         )
 
     db.commit()
@@ -854,7 +905,7 @@ def unassign_task_member(
         "assignee",
         task.id,
         "unassigned",
-        f'{{"user_id": {user_id}}}',
+        json.dumps({"user_id": user_id}),
         None,
     )
     db.commit()
@@ -957,7 +1008,7 @@ def soft_delete_task(
         "task",
         task.id,
         "deleted",
-        f'{{"title": "{task.title}"}}',
+        json.dumps({"title": task.title}, ensure_ascii=False),
         None,
     )
     db.commit()
@@ -998,7 +1049,7 @@ def restore_task(
         task.id,
         "restored",
         None,
-        f'{{"title": "{task.title}"}}',
+        json.dumps({"title": task.title}, ensure_ascii=False),
     )
     db.commit()
     db.refresh(task)

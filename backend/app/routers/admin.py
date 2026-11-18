@@ -6,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_role
+from app.core.ws_manager import disconnect_all_for_user_sync
 from app.crud import auth as auth_crud
 from app.db.session import get_db
 from app.models.list import ListModel
@@ -176,7 +177,10 @@ def toggle_user_status_admin(
         )
 
     user.is_active = body.is_active
+    if not body.is_active:
+        user.token_version = (user.token_version or 0) + 1
     db.commit()
     db.refresh(user)
+    if not body.is_active:
+        disconnect_all_for_user_sync(user.id, reason="Tài khoản đã bị khóa")
     return user
-

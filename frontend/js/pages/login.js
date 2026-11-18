@@ -1,18 +1,10 @@
 const loginForm = document.getElementById("login-form");
 const loginSubmit = document.getElementById("login-submit");
-const googleLogin = document.getElementById("google-login");
-
-googleLogin.addEventListener("click", () => {
-  window.location.assign(`${CONFIG.API_BASE_URL}/auth/google/login`);
-});
-
-const oauthError = new URLSearchParams(window.location.search).get("error");
-if (oauthError) showToast(oauthError, "error");
 
 function redirectAfterLogin() {
   const requestedPath = new URLSearchParams(window.location.search).get("next");
-  if (requestedPath) {
-    const destination = new URL(requestedPath, window.location.origin);
+  if (requestedPath && requestedPath !== "/index.html" && requestedPath !== "index.html") {
+    const destination = new URL(requestedPath, window.location.href);
     if (destination.origin === window.location.origin) {
       window.location.assign(`${destination.pathname}${destination.search}${destination.hash}`);
       return;
