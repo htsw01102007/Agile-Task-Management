@@ -42,16 +42,29 @@ def _build_project_detail(db: Session, project: Project, user_role: str) -> Proj
         .filter(ListModel.project_id == project.id, ListModel.is_done_column.is_(True))
         .all()
     ]
+    now_utc = datetime.now(timezone.utc)
     if done_list_ids:
         completed_task_count = active_tasks_query.filter(
             (Task.completed_at.isnot(None)) | (Task.list_id.in_(done_list_ids))
         ).count()
+        overdue_task_count = active_tasks_query.filter(
+            Task.due_date.isnot(None),
+            Task.due_date < now_utc,
+            Task.completed_at.is_(None),
+            ~Task.list_id.in_(done_list_ids),
+        ).count()
     else:
         completed_task_count = active_tasks_query.filter(Task.completed_at.isnot(None)).count()
+        overdue_task_count = active_tasks_query.filter(
+            Task.due_date.isnot(None),
+            Task.due_date < now_utc,
+            Task.completed_at.is_(None),
+        ).count()
     completion_rate = round((completed_task_count / task_count) * 100, 2) if task_count > 0 else 0.0
 
     response.task_count = task_count
     response.completed_task_count = completed_task_count
+    response.overdue_task_count = overdue_task_count
     response.completion_rate = completion_rate
     return response
 

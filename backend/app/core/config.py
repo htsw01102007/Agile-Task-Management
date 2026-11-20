@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     DB_NAME: str = "task_project_management"
 
     # JWT Security — SECRET_KEY thật đặt trong .env (gitignored)
-    SECRET_KEY: str = ""
+    SECRET_KEY: str = "agile-workspace-dev-secret-key-2026-min-32-chars-long"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7

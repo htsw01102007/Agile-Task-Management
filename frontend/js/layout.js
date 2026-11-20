@@ -19,67 +19,97 @@ function renderLayout(projects = [], user = FALLBACK_USER, projectsMessage = "Ch
   const isAuthenticated = Boolean(localStorage.getItem("access_token") || localStorage.getItem("token"));
   const isLoginPage = path.endsWith("login.html");
   const authAction = isAuthenticated
-    ? '<button class="header-auth" type="button" id="logout-button">Đăng xuất</button>'
+    ? `<button class="header-auth" type="button" id="logout-button" title="Đăng xuất khỏi phiên làm việc">${iconSvg("logout")}<span>Đăng xuất</span></button>`
     : isLoginPage
       ? `<a class="header-auth" href="${root}index.html">Trang chủ</a>`
-      : `<a class="header-auth" href="${root}pages/login.html?next=${encodeURIComponent(path + window.location.search)}">Đăng nhập</a>`;
+      : `<a class="header-auth" href="${root}pages/login.html">Đăng nhập</a>`;
   const projectId = new URLSearchParams(window.location.search).get("project");
   const isBoard = path.endsWith("project.html");
   const projectLinks = projects.map((project) => `
     <a class="nav-i project-link ${String(project.id) === projectId && isBoard ? "current" : ""}" href="${root}pages/project.html?project=${project.id}" title="${escapeHtml(project.name)}">
-      <span class="ic project-icon">${escapeHtml(layoutInitials(project.name))}</span><span class="lbl">${escapeHtml(project.name)}</span>
+      <span class="ic project-icon">${escapeHtml(layoutInitials(project.name))}</span>
+      <span class="lbl">${escapeHtml(project.name)}</span>
+      ${typeof project.task_count === "number" ? `<span class="nav-count">${project.task_count}</span>` : ""}
     </a>`).join("") || `<p class="sidebar-empty">${escapeHtml(projectsMessage)}</p>`;
+
   const userLinks = isAuthenticated ? `
-    <a class="nav-i ${path.endsWith("my-tasks.html") ? "current" : ""}" href="${root}pages/my-tasks.html"><span class="ic">✓</span><span class="lbl">Việc của tôi</span></a>
-    <a class="nav-i ${path.endsWith("invitations.html") ? "current" : ""}" href="${root}pages/invitations.html"><span class="ic">✉</span><span class="lbl">Lời mời</span></a>
-    <a class="nav-i ${path.endsWith("profile.html") ? "current" : ""}" href="${root}pages/profile.html"><span class="ic">◉</span><span class="lbl">Hồ sơ</span></a>` : "";
+    <a class="nav-i ${path.endsWith("my-tasks.html") ? "current" : ""}" href="${root}pages/my-tasks.html"><span class="ic">${iconSvg("tasks")}</span><span class="lbl">Việc của tôi</span></a>
+    <a class="nav-i ${path.endsWith("invitations.html") ? "current" : ""}" href="${root}pages/invitations.html"><span class="ic">${iconSvg("mail")}</span><span class="lbl">Lời mời dự án</span></a>
+    <a class="nav-i ${path.endsWith("profile.html") ? "current" : ""}" href="${root}pages/profile.html"><span class="ic">${iconSvg("user")}</span><span class="lbl">Hồ sơ &amp; Bảo mật</span></a>` : "";
+
   const adminLinks = isAuthenticated && user.system_role === "admin" ? `
-    <div class="sidebar-section admin-section"><p class="grp">QUẢN TRỊ</p>
-      <a class="nav-i ${path.endsWith("admin-users.html") ? "current" : ""}" href="${root}pages/admin-users.html"><span class="ic">♙</span><span class="lbl">Người dùng</span></a>
+    <div class="sidebar-section admin-section"><p class="grp">QUẢN TRỊ HỆ THỐNG</p>
+      <a class="nav-i ${path.endsWith("admin-users.html") ? "current" : ""}" href="${root}pages/admin-users.html"><span class="ic">${iconSvg("shield")}</span><span class="lbl">Quản lý người dùng</span></a>
     </div>` : "";
 
   const notifMarkup = isAuthenticated ? `
     <div class="notif-wrap">
       <button class="icon-btn notif-btn" type="button" id="notif-bell-btn" aria-label="Thông báo" title="Thông báo">
-        🔔<span id="notif-badge" class="notif-badge" hidden>0</span>
+        ${iconSvg("bell")}<span id="notif-badge" class="notif-badge" hidden>0</span>
       </button>
       <div id="notif-dropdown" class="notif-dropdown" hidden>
         <div class="notif-header">
-          <strong>Thông báo</strong>
+          <strong>Trung tâm thông báo</strong>
           <button class="btn btn-small" type="button" id="notif-read-all">Đánh dấu đã đọc</button>
         </div>
-        <div id="notif-list" class="notif-list"><p class="muted">Đang tải…</p></div>
+        <div id="notif-list" class="notif-list"><p class="muted notif-empty">Đang tải…</p></div>
       </div>
     </div>` : "";
 
   document.getElementById("app-header").innerHTML = `
-    <button class="icon-btn sidebar-toggle" type="button" aria-label="Thu gọn thanh bên" aria-expanded="true">☰</button>
-    <a href="${root}index.html" class="logo"><span class="mark">A</span><span class="brand-name">Agile Workspace</span></a>
-    <div class="header-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="Tìm công việc" aria-label="Tìm công việc"></div>
-    <div class="grow"></div>${notifMarkup}${authAction}${userAvatarMarkup(user, "avatar")}`;
+    <button class="icon-btn sidebar-toggle" type="button" aria-label="Thu gọn thanh bên" aria-expanded="true">${iconSvg("menu")}</button>
+    <a href="${root}index.html" class="logo">
+      <span class="mark">${iconSvg("logo")}</span>
+      <span class="brand-name">Agile Workspace</span>
+      <span class="brand-tag">PRO</span>
+    </a>
+    <div class="header-search">
+      <span aria-hidden="true">${iconSvg("search")}</span>
+      <input id="global-search-input" type="search" placeholder="Tìm nhanh dự án hoặc công việc…" aria-label="Tìm công việc">
+      <span class="kbd-hint">/</span>
+    </div>
+    <div class="grow"></div>
+    <div class="header-right">
+      ${notifMarkup}
+      ${authAction}
+      ${userAvatarMarkup(user, "avatar")}
+    </div>`;
+
   document.getElementById("app-sidebar").innerHTML = `
-    <div class="sidebar-section"><p class="grp">KHÔNG GIAN LÀM VIỆC</p>
-      <a class="nav-i ${path.endsWith("index.html") || path === "/" ? "current" : ""}" href="${root}index.html"><span class="ic">⌂</span><span class="lbl">Tổng quan</span></a>
+    <div class="workspace-pill">
+      <span class="workspace-pill-dot"></span>
+      <div class="workspace-pill-info">
+        <strong>Không gian Agile</strong>
+        <small>${isAuthenticated ? (user.system_role === "admin" ? "Quản trị viên hệ thống" : "Thành viên chính thức") : "Chế độ khách"}</small>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <p class="grp">ĐIỀU HƯỚNG CHÍNH</p>
+      <a class="nav-i ${path.endsWith("index.html") || path === "/" ? "current" : ""}" href="${root}index.html"><span class="ic">${iconSvg("home")}</span><span class="lbl">Tổng quan</span></a>
       ${userLinks}
     </div>
-    <div class="sidebar-section project-section"><div class="section-heading"><p class="grp">DỰ ÁN</p>${isAuthenticated ? `<a class="small-icon icon-btn" href="${root}index.html#new-project" aria-label="Tạo dự án">＋</a>` : ""}</div>${projectLinks}</div>
+    <div class="sidebar-section project-section">
+      <div class="section-heading">
+        <p class="grp">DỰ ÁN (${projects.length})</p>
+        ${isAuthenticated ? `<a class="small-icon icon-btn" href="${root}index.html#new-project" title="Tạo dự án mới" aria-label="Tạo dự án">${iconSvg("plus")}</a>` : ""}
+      </div>
+      ${projectLinks}
+    </div>
     ${adminLinks}
-    <a class="sidebar-bottom" href="${isAuthenticated ? `${root}pages/profile.html` : "#"}">${userAvatarMarkup(user, "avatar avatar-small")}<span class="lbl">${escapeHtml(user.full_name || "Tài khoản")}<small class="sidebar-email">${escapeHtml(user.email || "")}</small></span></a>`;
+    <a class="sidebar-bottom" href="${isAuthenticated ? `${root}pages/profile.html` : `${root}pages/login.html`}">
+      ${userAvatarMarkup(user, "avatar avatar-small")}
+      <span class="lbl">${escapeHtml(user.full_name || "Tài khoản")}<small class="sidebar-email">${escapeHtml(user.email || "Nhấn để đăng nhập")}</small></span>
+    </a>`;
+
+  hydrateIcons(document);
 
   document.querySelector(".sidebar-toggle").addEventListener("click", () => {
     const collapsed = app.classList.toggle("collapsed");
     document.querySelector(".sidebar-toggle").setAttribute("aria-expanded", String(!collapsed));
   });
-  document.getElementById("logout-button")?.addEventListener("click", async () => {
-    const refreshToken = localStorage.getItem("refresh_token");
-    try {
-      await api.post("/auth/logout", { refresh_token: refreshToken });
-    } catch {
-      // Bỏ qua lỗi mạng/token hết hạn khi đăng xuất
-    } finally {
-      ["access_token", "refresh_token", "token"].forEach((key) => localStorage.removeItem(key));
-      window.location.href = `${root}index.html`;
-    }
+  document.getElementById("logout-button")?.addEventListener("click", () => {
+    ["access_token", "refresh_token", "token"].forEach((key) => localStorage.removeItem(key));
+    window.location.href = `${root}index.html`;
   });
 
   const bellBtn = document.getElementById("notif-bell-btn");
@@ -106,6 +136,16 @@ function renderLayout(projects = [], user = FALLBACK_USER, projectsMessage = "Ch
     });
   }
 }
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
+    const searchEl = document.getElementById("global-search-input");
+    if (searchEl) {
+      e.preventDefault();
+      searchEl.focus();
+    }
+  }
+});
 
 async function refreshNotifications(root = document.body.dataset.root || "./") {
   const badge = document.getElementById("notif-badge");

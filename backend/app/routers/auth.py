@@ -124,11 +124,14 @@ def _is_invalid_client_config(client_id: str, client_secret: str) -> bool:
 
 
 @router.get("/google/login", summary="Bắt đầu đăng nhập bằng Google OAuth2")
-async def google_login(request: Request):
+async def google_login(request: Request, frontend_url: str | None = None):
+    frontend_base = (frontend_url or settings.FRONTEND_URL).rstrip("/")
+    request.session["frontend_url"] = frontend_base
+
     if _is_invalid_client_config(settings.GOOGLE_CLIENT_ID, settings.GOOGLE_CLIENT_SECRET):
-        error_msg = "Google OAuth2 chưa được cấu hình Client ID và Secret hợp lệ trong file .env."
+        error_msg = "Google OAuth2 chưa được cấu hình GOOGLE_CLIENT_ID và GOOGLE_CLIENT_SECRET hợp lệ trong file backend/.env."
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/pages/login.html?error={quote_plus(error_msg)}"
+            url=f"{frontend_base}/pages/login.html?error={quote_plus(error_msg)}"
         )
 
     redirect_uri = settings.GOOGLE_REDIRECT_URI
@@ -142,6 +145,7 @@ async def google_login(request: Request):
 
 @router.get("/google/callback", summary="Callback xử lý phản hồi từ Google OAuth2")
 async def google_callback(request: Request, db: Session = Depends(get_db)):
+    frontend_base = (request.session.pop("frontend_url", None) or settings.FRONTEND_URL).rstrip("/")
     try:
         token = await oauth.google.authorize_access_token(request)
         if not token:
@@ -176,23 +180,23 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 
         return RedirectResponse(
             url=(
-                f"{settings.FRONTEND_URL}/pages/oauth-callback.html"
+                f"{frontend_base}/pages/oauth-callback.html"
                 f"#access_token={token_response.access_token}&refresh_token={token_response.refresh_token}"
             )
         )
 
     except HTTPException as e:
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/pages/oauth-callback.html?error={quote_plus(str(e.detail))}"
+            url=f"{frontend_base}/pages/oauth-callback.html?error={quote_plus(str(e.detail))}"
         )
     except OAuthError as e:
         error_msg = f"Lỗi xác thực Google: {e.description if hasattr(e, 'description') and e.description else str(e)}"
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/pages/oauth-callback.html?error={quote_plus(error_msg)}"
+            url=f"{frontend_base}/pages/oauth-callback.html?error={quote_plus(error_msg)}"
         )
     except Exception as e:
         error_msg = f"Đăng nhập Google thất bại: {str(e)}"
         return RedirectResponse(
-            url=f"{settings.FRONTEND_URL}/pages/oauth-callback.html?error={quote_plus(error_msg)}"
+            url=f"{frontend_base}/pages/oauth-callback.html?error={quote_plus(error_msg)}"
         )
 

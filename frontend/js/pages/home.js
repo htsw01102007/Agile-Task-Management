@@ -5,6 +5,9 @@ const projectCards = document.getElementById("project-cards");
 const projectDialog = document.getElementById("project-dialog");
 const projectForm = document.getElementById("project-form");
 const projectStatusFilter = document.getElementById("project-status-filter");
+const projectSearchInput = document.getElementById("project-search");
+const viewGridBtn = document.getElementById("view-grid-btn");
+const viewListBtn = document.getElementById("view-list-btn");
 
 let projects = [];
 let currentUser = null;
@@ -15,6 +18,7 @@ if (dashboardDate) {
     weekday: "long",
     day: "numeric",
     month: "numeric",
+    year: "numeric",
   }).format(new Date()).toUpperCase();
 }
 
@@ -22,28 +26,107 @@ function projectStatusText(status) {
   return { active: "Đang hoạt động", completed: "Hoàn thành", archived: "Đã lưu trữ" }[status] || status;
 }
 
+function roleLabel(role) {
+  return { owner: "Owner", manager: "Manager", member: "Member", viewer: "Viewer" }[role] || role || "Member";
+}
+
+function renderWorkspaceHealth() {
+  const totalTasks = projects.reduce((acc, p) => acc + (p.task_count || 0), 0);
+  const completedTasks = projects.reduce((acc, p) => acc + (p.completed_task_count || 0), 0);
+  const overdueTasks = projects.reduce((acc, p) => acc + (p.overdue_task_count || 0), 0);
+  const activeTasks = Math.max(0, totalTasks - completedTasks);
+
+  const donePct = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const activePct = totalTasks ? Math.round((activeTasks / totalTasks) * 100) : 0;
+  const overduePct = totalTasks ? Math.min(100, Math.round((overdueTasks / totalTasks) * 100)) : 0;
+
+  const doneLabel = document.getElementById("health-done-label");
+  const activeLabel = document.getElementById("health-active-label");
+  const overdueLabel = document.getElementById("health-overdue-label");
+  if (doneLabel) doneLabel.textContent = `${completedTasks}/${totalTasks} việc (${donePct}%)`;
+  if (activeLabel) activeLabel.textContent = `${activeTasks} việc (${activePct}%)`;
+  if (overdueLabel) overdueLabel.textContent = `${overdueTasks} việc`;
+
+  const doneBar = document.getElementById("health-done-bar");
+  const activeBar = document.getElementById("health-active-bar");
+  const overdueBar = document.getElementById("health-overdue-bar");
+  if (doneBar) doneBar.style.width = `${donePct}%`;
+  if (activeBar) activeBar.style.width = `${activePct}%`;
+  if (overdueBar) overdueBar.style.width = `${overduePct}%`;
+}
+
+function renderUpcomingTasks(myTasks = []) {
+  const container = document.getElementById("upcoming-tasks-list");
+  if (!container) return;
+  const pending = myTasks.filter((t) => !t.completed_at).slice(0, 5);
+  if (!pending.length) {
+    container.innerHTML = '<p class="empty-state" style="padding:18px;">Tuyệt vời! Bạn không có công việc tồn đọng nào.</p>';
+    return;
+  }
+  const priorityNames = { low: "Thấp", medium: "TB", high: "Cao", urgent: "Khẩn" };
+  const projectMap = new Map(projects.map((p) => [p.id, p]));
+  container.innerHTML = pending.map((t) => {
+    const proj = projectMap.get(t.project_id);
+    const due = t.due_date ? formatDateTime(t.due_date) : "Chưa đặt hạn";
+    return `<a class="mini-task-item" href="pages/project.html?project=${t.project_id}&task=${t.id}">
+      <span class="priority priority-${escapeHtml(t.priority)}">${escapeHtml(priorityNames[t.priority] || t.priority)}</span>
+      <div class="mini-task-body">
+        <strong>${escapeHtml(t.title)}</strong>
+        <small>${escapeHtml(proj?.name || `Dự án #${t.project_id}`)} · ${escapeHtml(due)}</small>
+      </div>
+    </a>`;
+  }).join("");
+}
+
 function renderProjects() {
-  const statusFilter = projectStatusFilter.value;
-  const visibleProjects = projects.filter((project) => !statusFilter || project.status === statusFilter);
+  const statusFilter = projectStatusFilter?.value || "";
+  const query = (projectSearchInput?.value || "").trim().toLocaleLowerCase("vi");
+  const visibleProjects = projects.filter((project) => {
+    const matchStatus = !statusFilter || project.status === statusFilter;
+    const matchQuery = !query
+      || project.name.toLocaleLowerCase("vi").includes(query)
+      || (project.description || "").toLocaleLowerCase("vi").includes(query);
+    return matchStatus && matchQuery;
+  });
+
   if (!visibleProjects.length) {
-    projectCards.innerHTML = `<p class="empty-state">${projects.length ? "Không có dự án phù hợp bộ lọc." : "Bạn chưa tham gia dự án nào."}${projects.length ? "" : '<br><span>Tạo dự án mới để bắt đầu.</span>'}</p>`;
+    projectCards.innerHTML = `<p class="empty-state" style="grid-column: 1 / -1;">${projects.length ? "Không tìm thấy dự án nào khớp với bộ lọc hiện tại." : "Bạn chưa tham gia dự án nào."}${projects.length ? "" : '<br><span>Nhấn "Khởi tạo dự án mới" ở góc trên để bắt đầu.</span>'}</p>`;
     return;
   }
   projectCards.innerHTML = visibleProjects.map((project, index) => {
     const canManage = ["owner", "manager"].includes(project.user_role);
     const canDelete = project.user_role === "owner";
     const canEdit = canManage && project.status === "active";
-    const color = ["teal", "amber", "violet"][index % 3];
+    const color = ["teal", "amber", "violet", "emerald"][index % 4];
+    const rate = Math.round(project.completion_rate || 0);
     return `<article class="project-card project-entry">
       <a class="project-card-link" href="pages/project.html?project=${project.id}">
-        <div class="project-card-top"><span class="project-mark ${color}">${escapeHtml(layoutInitials(project.name))}</span><span class="project-status"><i class="${project.status === "active" ? "" : "status-inactive"}"></i>${escapeHtml(projectStatusText(project.status))}</span></div>
-        <h3>${escapeHtml(project.name)}</h3><p class="muted">${escapeHtml(project.description || "Chưa có mô tả.")}</p>
-        <div class="project-progress"><div><span>Tiến độ · ${project.task_count} việc</span><strong>${Math.round(project.completion_rate)}%</strong></div><progress value="${project.completion_rate}" max="100"></progress></div>
+        <div class="project-card-top">
+          <span class="project-mark ${color}">${escapeHtml(layoutInitials(project.name))}</span>
+          <div class="project-badges">
+            <span class="role-badge">${escapeHtml(roleLabel(project.user_role))}</span>
+            <span class="project-status"><i class="${project.status === "active" ? "" : "status-inactive"}"></i>${escapeHtml(projectStatusText(project.status))}</span>
+          </div>
+        </div>
+        <h3>${escapeHtml(project.name)}</h3>
+        <p class="muted">${escapeHtml(project.description || "Chưa có mô tả chi tiết cho dự án này.")}</p>
+        <div class="project-stats-pills">
+          <span class="stat-pill">${iconSvg("columns")} <span>${project.task_count} công việc</span></span>
+          <span class="stat-pill">${iconSvg("check")} <span>${project.completed_task_count || 0} hoàn thành</span></span>
+          ${project.overdue_task_count > 0 ? `<span class="stat-pill overdue">${iconSvg("alert")} <span>${project.overdue_task_count} quá hạn</span></span>` : ""}
+        </div>
+        <div class="project-progress">
+          <div><span>Tiến độ tổng thể</span><strong>${rate}%</strong></div>
+          <progress value="${rate}" max="100"></progress>
+        </div>
       </a>
-      <div class="project-card-bottom"><span>♙ ${project.member_count} thành viên · ${escapeHtml(project.user_role || "")}</span><span class="project-card-actions">
-        ${canManage ? `<button class="btn btn-small" type="button" data-action="edit" data-project-id="${project.id}" ${canEdit ? "" : "disabled"}>Sửa</button>` : ""}
-        ${canDelete ? `<button class="btn btn-small btn-danger" type="button" data-action="delete" data-project-id="${project.id}">Xoá</button>` : ""}
-      </span></div>
+      <div class="project-card-bottom">
+        <span style="display:inline-flex;align-items:center;gap:5px;">${iconSvg("users")} <span>${project.member_count} thành viên</span></span>
+        <span class="project-card-actions">
+          ${canManage ? `<button class="btn btn-small" type="button" data-action="edit" data-project-id="${project.id}" ${canEdit ? "" : "disabled"}>Chỉnh sửa</button>` : ""}
+          ${canDelete ? `<button class="btn btn-small btn-danger" type="button" data-action="delete" data-project-id="${project.id}">Lưu trữ</button>` : ""}
+        </span>
+      </div>
     </article>`;
   }).join("");
 }
@@ -51,7 +134,7 @@ function renderProjects() {
 function openProjectForm(project = null) {
   editingProjectId = project?.id ?? null;
   projectForm.reset();
-  document.getElementById("project-form-title").textContent = project ? "Chỉnh sửa dự án" : "Tạo dự án";
+  document.getElementById("project-form-title").textContent = project ? "Chỉnh sửa thông tin dự án" : "Khởi tạo dự án mới";
   document.getElementById("project-submit").textContent = project ? "Lưu thay đổi" : "Tạo dự án";
   projectForm.elements.name.value = project?.name || "";
   projectForm.elements.description.value = project?.description || "";
@@ -77,7 +160,7 @@ function renderAdminOverview(summary) {
     <tr>
       <td><strong>${escapeHtml(user.full_name)}</strong><small>@${escapeHtml(user.username)}</small></td>
       <td>${escapeHtml(user.email)}</td>
-      <td>${escapeHtml(user.system_role)}</td>
+      <td><span class="role-badge">${escapeHtml(user.system_role)}</span></td>
       <td><span class="role-badge ${user.is_active ? "status-active" : "status-inactive"}">${user.is_active ? "Đang hoạt động" : "Đã khóa"}</span></td>
       <td>${escapeHtml(formatDateTime(user.created_at))}</td>
     </tr>`).join("") : '<tr><td colspan="5" class="muted">Chưa có tài khoản nào.</td></tr>';
@@ -92,22 +175,31 @@ async function loadDashboard() {
   }
   dashboardContent.hidden = false;
   authPrompt.hidden = true;
-  projectCards.innerHTML = '<p class="empty-state">Đang tải dự án…</p>';
+  projectCards.innerHTML = '<p class="empty-state" style="grid-column: 1 / -1;">Đang tải danh mục dự án…</p>';
   document.getElementById("admin-overview").hidden = true;
   try {
     const user = await api.get("/auth/me");
-    const [projectData, metrics] = await Promise.all([
+    const [projectData, metrics, myTasks] = await Promise.all([
       api.get("/projects/summary"),
       api.get("/projects/dashboard/summary"),
+      api.get("/tasks/my-tasks", { page: 1, size: 15 }).catch(() => []),
     ]);
     currentUser = user;
     projects = projectData;
-    document.getElementById("dashboard-greeting").textContent = `Chào ${user.full_name}`;
+    document.getElementById("dashboard-greeting").textContent = `Xin chào, ${user.full_name}`;
     document.getElementById("create-project-button").hidden = false;
     document.getElementById("metric-projects").textContent = metrics.active_project_count;
     document.getElementById("metric-pending").textContent = metrics.pending_task_count;
     document.getElementById("metric-completed").textContent = metrics.completed_task_count;
+    const totalMy = (metrics.pending_task_count || 0) + (metrics.completed_task_count || 0);
+    const myRate = totalMy ? Math.round((metrics.completed_task_count / totalMy) * 100) : 0;
+    const rateEl = document.getElementById("metric-rate");
+    if (rateEl) rateEl.textContent = `${myRate}%`;
+
     renderProjects();
+    renderWorkspaceHealth();
+    renderUpcomingTasks(myTasks);
+
     if (user.system_role === "admin") {
       const adminOverview = document.getElementById("admin-overview");
       adminOverview.hidden = false;
@@ -127,20 +219,39 @@ async function loadDashboard() {
       dashboardContent.hidden = true;
       return;
     }
-    projectCards.innerHTML = `<p class="status status-error">${escapeHtml(error.message)} <button class="btn btn-small" type="button" id="retry-dashboard">Thử lại</button></p>`;
-    document.getElementById("retry-dashboard").addEventListener("click", loadDashboard);
+    projectCards.innerHTML = `<p class="status status-error" style="grid-column: 1 / -1;">${escapeHtml(error.message)} <button class="btn btn-small" type="button" id="retry-dashboard">Thử lại</button></p>`;
+    document.getElementById("retry-dashboard")?.addEventListener("click", loadDashboard);
   }
 }
 
-document.getElementById("create-project-button").addEventListener("click", () => openProjectForm());
-document.getElementById("project-cards").addEventListener("click", async (event) => {
+viewGridBtn?.addEventListener("click", () => {
+  projectCards.classList.remove("list-mode");
+  viewGridBtn.classList.add("active");
+  viewListBtn?.classList.remove("active");
+});
+viewListBtn?.addEventListener("click", () => {
+  projectCards.classList.add("list-mode");
+  viewListBtn.classList.add("active");
+  viewGridBtn?.classList.remove("active");
+});
+
+document.getElementById("create-project-button")?.addEventListener("click", () => openProjectForm());
+document.getElementById("project-cards")?.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
   const id = Number(button.dataset.projectId);
   const project = projects.find((item) => item.id === id);
   if (!project) return;
   if (button.dataset.action === "edit") openProjectForm(project);
-  if (button.dataset.action === "delete" && confirm(`Xoá mềm dự án "${project.name}"?`)) {
+  if (button.dataset.action === "delete") {
+    const ok = await showConfirmModal({
+      eyebrow: "LƯU TRỮ DỰ ÁN",
+      title: `Lưu trữ "${project.name}"?`,
+      message: "Dự án sẽ được chuyển vào trạng thái lưu trữ. Bạn có thể xem lại bất cứ lúc nào.",
+      confirmText: "Lưu trữ dự án",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.delete(`/projects/${id}`);
       showToast("Đã chuyển dự án vào lưu trữ");
@@ -151,7 +262,7 @@ document.getElementById("project-cards").addEventListener("click", async (event)
   }
 });
 
-projectForm.addEventListener("submit", async (event) => {
+projectForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const formData = new FormData(projectForm);
   const payload = {
@@ -177,24 +288,35 @@ projectForm.addEventListener("submit", async (event) => {
     projectDialog.close();
     await loadDashboard();
   } catch (error) {
-    showToast(error.message, "error");
+    if (!applyApiErrorsToForm(projectForm, error)) {
+      showToast(error.message, "error");
+    }
   } finally {
     submitButton.disabled = false;
   }
 });
 
-document.getElementById("project-cards").addEventListener("click", (event) => {
+document.getElementById("project-cards")?.addEventListener("click", (event) => {
   if (event.target.closest("a.project-card-link")) return;
   const button = event.target.closest("button[data-action=edit]");
   if (button) event.preventDefault();
 });
-projectStatusFilter.addEventListener("change", renderProjects);
+projectStatusFilter?.addEventListener("change", renderProjects);
+projectSearchInput?.addEventListener("input", renderProjects);
+document.getElementById("global-search-input")?.addEventListener("input", (e) => {
+  if (projectSearchInput) {
+    projectSearchInput.value = e.target.value;
+    renderProjects();
+  }
+});
 document.querySelectorAll("[data-close-dialog]").forEach((button) => button.addEventListener("click", () => projectDialog.close()));
-projectDialog.addEventListener("click", (event) => {
+projectDialog?.addEventListener("click", (event) => {
   if (event.target === projectDialog) projectDialog.close();
 });
 window.addEventListener("hashchange", () => {
-  if (window.location.hash === "#new-project" && !dashboardContent.hidden) openProjectForm();
+  if (window.location.hash === "#new-project" && dashboardContent && !dashboardContent.hidden) openProjectForm();
 });
 
-loadDashboard();
+if (dashboardContent) {
+  loadDashboard();
+}
