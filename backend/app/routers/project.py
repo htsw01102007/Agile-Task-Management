@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.sql import func
 from typing import List, Optional
 from datetime import datetime, timezone
+from app.core.time import as_utc_naive, utc_now_naive
 
 from app.db.session import get_db
 from app.core.deps import get_current_user
@@ -12,7 +13,10 @@ from app.models.user import User
 from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.models.list import ListModel
-from app.models.task import Task, TaskAssignee
+from app.models.task import Task, TaskAssignee, TaskLabel
+from app.models.checklist import ChecklistItem
+from app.models.comment import Comment
+from app.models.attachment import Attachment
 from app.crud.project import create_project_with_owner, query_active_projects
 from app.schemas.project import (
     ProjectCreate,
@@ -136,17 +140,21 @@ def list_my_projects(
 
 @router.get("/summary", response_model=List[ProjectDetailResponse])
 def list_my_projects_summary(
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
 ):
     """Danh sách dự án của người dùng hiện tại kèm thống kê số thành viên, tiến độ công việc và vai trò"""
-    rows = (
+    query = (
         db.query(Project, ProjectMember.role)
         .join(ProjectMember, ProjectMember.project_id == Project.id)
         .filter(Project.deleted_at.is_(None), ProjectMember.user_id == current_user.id)
-        .order_by(Project.created_at.desc(), Project.id.desc())
-        .all()
     )
+    total = query.count()
+    rows = query.order_by(Project.created_at.desc(), Project.id.desc()).offset(skip).limit(limit).all()
+    response.headers["X-Total-Count"] = str(total)
     return [_build_project_detail(db, proj, role) for proj, role in rows]
 
 
@@ -205,8 +213,11 @@ def get_project_detail(
 @router.get("/{project_id}/board", response_model=ProjectBoardResponse)
 def get_project_board(
     project_id: int,
+    response: Response,
     db: Session = Depends(get_db),
     data: tuple[Project, ProjectMember] = Depends(get_project_and_membership),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=500),
 ):
     """Lấy toàn bộ cột (lists) và công việc (tasks kèm người thực hiện, nhãn) cho bảng Kanban"""
     project, _ = data
@@ -216,15 +227,53 @@ def get_project_board(
         .order_by(ListModel.position.asc(), ListModel.id.asc())
         .all()
     )
-    tasks = (
+    task_query = (
         db.query(Task)
+        .options(
+            selectinload(Task.assignees).selectinload(TaskAssignee.user),
+            selectinload(Task.labels).selectinload(TaskLabel.label),
+            selectinload(Task.creator),
+        )
         .filter(Task.project_id == project_id, Task.is_deleted.is_(False))
-        .order_by(Task.position.asc(), Task.id.asc())
+    )
+    response.headers["X-Total-Tasks"] = str(task_query.count())
+    tasks = (
+        task_query.order_by(Task.position.asc(), Task.id.asc())
+        .offset(skip)
+        .limit(limit)
         .all()
     )
+    task_ids = [task.id for task in tasks]
+    checklist_stats = {}
+    comments_counts = {}
+    attachment_counts = {}
+    if task_ids:
+        checklist_stats = {
+            task_id: (total, completed)
+            for task_id, total, completed in db.query(
+                ChecklistItem.task_id, func.count(ChecklistItem.id),
+                func.sum(func.if_(ChecklistItem.is_done.is_(True), 1, 0)),
+            ).filter(ChecklistItem.task_id.in_(task_ids)).group_by(ChecklistItem.task_id).all()
+        }
+        comments_counts = dict(
+            db.query(Comment.task_id, func.count(Comment.id))
+            .filter(Comment.task_id.in_(task_ids)).group_by(Comment.task_id).all()
+        )
+        attachment_counts = dict(
+            db.query(Attachment.task_id, func.count(Attachment.id))
+            .filter(Attachment.task_id.in_(task_ids)).group_by(Attachment.task_id).all()
+        )
     return ProjectBoardResponse(
         lists=[ListResponse.model_validate(lst) for lst in lists],
-        tasks=[_build_task_detail_response(db, t) for t in tasks],
+        tasks=[
+            _build_task_detail_response(
+                db, task, include_checklist_items=False,
+                checklist_stats=checklist_stats.get(task.id, (0, 0)),
+                comments_count=comments_counts.get(task.id, 0),
+                attachments_count=attachment_counts.get(task.id, 0),
+            )
+            for task in tasks
+        ],
     )
 
 
@@ -251,8 +300,8 @@ def update_project(
                 detail=f"Dự án đang ở trạng thái '{project.status}' (chỉ đọc), hãy mở lại trạng thái 'active' trước khi chỉnh sửa",
             )
 
-    new_start = update_data.get("start_date", project.start_date)
-    new_end = update_data.get("end_date", project.end_date)
+    new_start = as_utc_naive(update_data.get("start_date", project.start_date))
+    new_end = as_utc_naive(update_data.get("end_date", project.end_date))
     if new_start and new_end and new_end < new_start:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -260,6 +309,8 @@ def update_project(
         )
 
     for field, value in update_data.items():
+        if field in ("start_date", "end_date"):
+            value = as_utc_naive(value)
         setattr(project, field, value)
 
     db.commit()
@@ -436,7 +487,7 @@ def update_list(
             ).update({ListModel.is_done_column: False}, synchronize_session=False)
             lst.is_done_column = True
             # Tự cập nhật completed_at cho các task đang ở trong cột hoàn thành mới này
-            now = datetime.now(timezone.utc)
+            now = utc_now_naive()
             db.query(Task).filter(
                 Task.list_id == list_id,
                 Task.is_deleted.is_(False),
@@ -556,7 +607,7 @@ def delete_list(
             .first()
         )
         next_pos = (max_pos_row[0] + 1) if max_pos_row else 0
-        now = datetime.now(timezone.utc)
+        now = utc_now_naive()
 
         for t in all_tasks_in_list:
             t.list_id = target_list.id

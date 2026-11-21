@@ -118,6 +118,9 @@ def test_production_settings_validation_blocks_defaults():
         DB_PASSWORD="ProdDbPassword!999",
         CORS_ORIGINS="https://app.example.com",
         FRONTEND_URL="https://app.example.com",
+        SMTP_HOST="smtp.example.com",
+        SMTP_FROM_EMAIL="noreply@example.com",
+        PASSWORD_RESET_URL="https://app.example.com/pages/reset-password.html",
     )
     secure.validate_production_settings()
     assert secure.cors_allow_credentials is True

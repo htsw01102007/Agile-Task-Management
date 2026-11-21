@@ -1,7 +1,7 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
 from sqlalchemy import case
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from typing import List, Optional
 from datetime import datetime, timezone
 import json
@@ -18,12 +18,16 @@ from app.core.permissions import (
     validate_assignees_not_viewers,
 )
 from app.core.config import settings
+from app.core.time import as_utc_naive, utc_now_naive
 from app.core.deps import get_current_user
 from app.core.ws_manager import notify_project_sync, notify_user_sync
 from app.models.user import User
 from app.models.project import Project
 from app.models.project_member import ProjectMember
 from app.models.task import Task, TaskAssignee, TaskLabel
+from app.models.checklist import ChecklistItem
+from app.models.comment import Comment
+from app.models.attachment import Attachment
 from app.models.list import ListModel
 from app.models.label import Label
 from app.models.notification import Notification
@@ -120,7 +124,14 @@ def _create_activity_log(
     return log
 
 
-def _build_task_detail_response(db: Session, task: Task) -> TaskDetailResponse:
+def _build_task_detail_response(
+    db: Session,
+    task: Task,
+    include_checklist_items: bool = True,
+    checklist_stats: tuple[int, int] | None = None,
+    comments_count: int | None = None,
+    attachments_count: int | None = None,
+) -> TaskDetailResponse:
     """Build detailed task response with relationships and checklist progress %"""
     assignees = []
     for ta in task.assignees:
@@ -141,12 +152,16 @@ def _build_task_detail_response(db: Session, task: Task) -> TaskDetailResponse:
                 label_color=tl.label.color,
             ))
 
-    sorted_checklist = sorted(task.checklist_items, key=lambda c: (c.position, c.id))
-    checklist = [
-        ChecklistItemResponse.model_validate(ci) for ci in sorted_checklist
-    ]
-    checklist_total = len(checklist)
-    checklist_completed = sum(1 for ci in checklist if ci.is_done)
+    if checklist_stats is None:
+        sorted_checklist = sorted(task.checklist_items, key=lambda c: (c.position, c.id))
+        checklist_total = len(sorted_checklist)
+        checklist_completed = sum(1 for ci in sorted_checklist if ci.is_done)
+    else:
+        checklist_total, checklist_completed = checklist_stats
+    checklist = []
+    if include_checklist_items:
+        sorted_checklist = sorted(task.checklist_items, key=lambda c: (c.position, c.id))
+        checklist = [ChecklistItemResponse.model_validate(ci) for ci in sorted_checklist]
     checklist_progress = (
         round((checklist_completed / checklist_total) * 100, 2)
         if checklist_total > 0
@@ -175,8 +190,8 @@ def _build_task_detail_response(db: Session, task: Task) -> TaskDetailResponse:
         checklist_total=checklist_total,
         checklist_completed=checklist_completed,
         checklist_progress=checklist_progress,
-        comments_count=len(task.comments),
-        attachments_count=len(task.attachments),
+        comments_count=comments_count if comments_count is not None else len(task.comments),
+        attachments_count=attachments_count if attachments_count is not None else len(task.attachments),
         creator_name=task.creator.full_name if task.creator else None,
     )
 
@@ -201,6 +216,11 @@ def _query_my_tasks(
 ) -> List[Task]:
     query = (
         db.query(Task)
+        .options(
+            selectinload(Task.assignees).selectinload(TaskAssignee.user),
+            selectinload(Task.labels).selectinload(TaskLabel.label),
+            selectinload(Task.creator),
+        )
         .join(TaskAssignee, TaskAssignee.task_id == Task.id)
         .join(Project, Project.id == Task.project_id)
         .join(
@@ -226,7 +246,7 @@ def _query_my_tasks(
         else:
             query = query.filter(Task.completed_at.is_(None))
     if is_overdue is not None:
-        now = datetime.now(timezone.utc)
+        now = utc_now_naive()
         if is_overdue:
             query = query.filter(Task.due_date.isnot(None), Task.due_date < now, Task.completed_at.is_(None))
         else:
@@ -359,7 +379,7 @@ def list_tasks(
         else:
             query = query.filter(Task.completed_at.is_(None))
     if is_overdue is not None:
-        now = datetime.now(timezone.utc)
+        now = utc_now_naive()
         if is_overdue:
             query = query.filter(Task.due_date.isnot(None), Task.due_date < now, Task.completed_at.is_(None))
         else:
@@ -479,7 +499,10 @@ def create_task(
     if not list_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Danh sách không tồn tại")
 
-    if task_in.start_date and task_in.due_date and task_in.due_date < task_in.start_date:
+    if (
+        task_in.start_date and task_in.due_date
+        and as_utc_naive(task_in.due_date) < as_utc_naive(task_in.start_date)
+    ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hạn chót không được sớm hơn ngày bắt đầu")
 
     if task_in.position is not None:
@@ -495,7 +518,7 @@ def create_task(
                 item.position += 1
     else:
         position = _get_next_position(db, task_in.list_id)
-    completed_at = datetime.now(timezone.utc) if list_obj.is_done_column else None
+    completed_at = utc_now_naive() if list_obj.is_done_column else None
 
     task = Task(
         project_id=project_id,
@@ -504,8 +527,8 @@ def create_task(
         description=task_in.description,
         priority=task_in.priority,
         position=position,
-        start_date=task_in.start_date,
-        due_date=task_in.due_date,
+        start_date=as_utc_naive(task_in.start_date),
+        due_date=as_utc_naive(task_in.due_date),
         completed_at=completed_at,
         created_by=member.user_id,
     )
@@ -574,8 +597,8 @@ def update_task(
 
     update_data = task_update.model_dump(exclude_unset=True)
 
-    new_start = update_data.get("start_date", task.start_date)
-    new_due = update_data.get("due_date", task.due_date)
+    new_start = as_utc_naive(update_data.get("start_date", task.start_date))
+    new_due = as_utc_naive(update_data.get("due_date", task.due_date))
     if new_start and new_due and new_due < new_start:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Hạn chót không được sớm hơn ngày bắt đầu")
 
@@ -590,7 +613,7 @@ def update_task(
         old_value = getattr(task, field)
         if old_value != value:
             changes[field] = {"old": str(old_value) if old_value else None, "new": str(value) if value else None}
-            setattr(task, field, value)
+            setattr(task, field, as_utc_naive(value) if field in ("start_date", "due_date") else value)
 
     if "list_id" in update_data and target_list_id != old_list_id:
         new_list = db.query(ListModel).filter(ListModel.id == target_list_id, ListModel.project_id == project_id).first()
@@ -605,7 +628,7 @@ def update_task(
         )
 
         if new_list.is_done_column:
-            task.completed_at = datetime.now(timezone.utc)
+            task.completed_at = utc_now_naive()
         elif task.completed_at:
             task.completed_at = None
 
@@ -707,7 +730,7 @@ def move_task(
             t.position = idx
 
         if new_list.is_done_column:
-            task.completed_at = datetime.now(timezone.utc)
+            task.completed_at = utc_now_naive()
         elif task.completed_at:
             task.completed_at = None
 
@@ -998,7 +1021,7 @@ def soft_delete_task(
 
     old_list_id = task.list_id
     task.is_deleted = True
-    task.deleted_at = datetime.now(timezone.utc)
+    task.deleted_at = utc_now_naive()
     _renumber_list_tasks(db, old_list_id, exclude_task_id=task.id)
     _create_activity_log(
         db,
@@ -1028,10 +1051,8 @@ def restore_task(
     task, member = data
 
     if task.deleted_at:
-        deleted_dt = task.deleted_at
-        if deleted_dt.tzinfo is None:
-            deleted_dt = deleted_dt.replace(tzinfo=timezone.utc)
-        if (datetime.now(timezone.utc) - deleted_dt).days > 30:
+        deleted_dt = task.deleted_at.replace(tzinfo=timezone.utc) if task.deleted_at.tzinfo is None else task.deleted_at
+        if (datetime.now(timezone.utc) - deleted_dt.astimezone(timezone.utc)).days > 30:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Không thể khôi phục task đã xoá quá 30 ngày",

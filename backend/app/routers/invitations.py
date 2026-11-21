@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone
+from app.core.time import utc_now_naive
 
 from app.db.session import get_db
 from app.core.permissions import require_project_roles
@@ -36,16 +37,24 @@ def create_invitation(
 @router.get("", response_model=List[InvitationResponse])
 def list_invitations(
     project_id: int,
+    response: Response,
     db: Session = Depends(get_db),
     data: tuple[Project, ProjectMember] = Depends(require_project_roles("owner", "manager")),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
 ):
     project, _ = data
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = utc_now_naive()
     invitations = (
         db.query(ProjectInvitation)
         .filter(ProjectInvitation.project_id == project_id)
-        .order_by(ProjectInvitation.created_at.desc())
+        .order_by(ProjectInvitation.created_at.desc(), ProjectInvitation.id.desc())
+        .offset(skip)
+        .limit(limit)
         .all()
+    )
+    response.headers["X-Total-Count"] = str(
+        db.query(ProjectInvitation.id).filter(ProjectInvitation.project_id == project_id).count()
     )
     updated_expired = False
     for inv in invitations:
@@ -78,6 +87,6 @@ def cancel_invitation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lời mời không tồn tại hoặc đã được xử lý")
 
     invitation.status = "cancelled"
-    invitation.responded_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    invitation.responded_at = utc_now_naive()
     db.commit()
     return None

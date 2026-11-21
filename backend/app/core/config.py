@@ -42,6 +42,20 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     PASSWORD_RESET_EXPIRE_MINUTES: int = 30
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_USE_TLS: bool = True
+    PASSWORD_RESET_URL: str = ""
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_USE_TLS: bool = True
+    PASSWORD_RESET_URL: str = ""
 
     # Google OAuth2
     GOOGLE_CLIENT_ID: str = ""
@@ -86,6 +100,8 @@ class Settings(BaseSettings):
             errors.append("DB_PASSWORD không được để trống hoặc dùng mật khẩu mặc định ở môi trường production")
         if self.CORS_ORIGINS.strip() == "*" or "*" in self.cors_origin_list:
             errors.append("CORS_ORIGINS không được dùng '*' ở môi trường production")
+        # Email configuration is validated when the password-reset delivery path is used.
+        # Keep deployments that do not expose password reset backward compatible.
 
         if errors:
             raise RuntimeError("Cấu hình production không an toàn: " + "; ".join(errors))

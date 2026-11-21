@@ -9,6 +9,7 @@ from authlib.integrations.base_client.errors import OAuthError
 from app.db.session import get_db
 from app.core.deps import get_current_user, oauth2_scheme
 from app.core.config import settings
+from app.core.rate_limit import enforce_rate_limit
 from app.schemas.auth import (
     RegisterRequest,
     LoginRequest,
@@ -30,14 +31,16 @@ router = APIRouter(prefix="/auth", tags=["Auth & User"])
 
 # ── 1. Đăng ký & Đăng nhập ────────────────────────────────
 @router.post("/register", response_model=UserOut, status_code=201, summary="Đăng ký tài khoản")
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+def register(request: Request, body: RegisterRequest, db: Session = Depends(get_db)):
     """Đăng ký tài khoản thông thường: Email, Username, Mật khẩu mạnh, Họ tên."""
+    enforce_rate_limit(request, "register", account=body.email, limit=100, account_limit=5, window_seconds=3600)
     return auth_crud.register_user(db, body)
 
 
 @router.post("/login", response_model=TokenResponse, summary="Đăng nhập tài khoản")
-def login(body: LoginRequest, db: Session = Depends(get_db)):
+def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     """Đăng nhập bằng Email hoặc Username + Mật khẩu. Trả về access_token + refresh_token."""
+    enforce_rate_limit(request, "login", account=body.identifier, limit=200, account_limit=10, window_seconds=60)
     return auth_crud.authenticate_user(db, body)
 
 
@@ -59,21 +62,24 @@ def logout(
 
 # ── 2. Làm mới Token ──────────────────────────────────────
 @router.post("/refresh", response_model=TokenResponse, summary="Làm mới access token bằng refresh token")
-def refresh_token(body: RefreshRequest, db: Session = Depends(get_db)):
+def refresh_token(request: Request, body: RefreshRequest, db: Session = Depends(get_db)):
     """Sử dụng refresh_token để lấy cặp access_token và refresh_token mới."""
+    enforce_rate_limit(request, "refresh", limit=100, window_seconds=60)
     return auth_crud.refresh_user_token(db, body.refresh_token)
 
 
 # ── 3. Quên mật khẩu & Đặt lại mật khẩu ───────────────────
 @router.post("/forgot-password", response_model=ForgotPasswordResponse, summary="Yêu cầu đặt lại mật khẩu")
-def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(request: Request, body: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """Tạo token đặt lại mật khẩu có thời hạn 30 phút lưu vào DB."""
+    enforce_rate_limit(request, "forgot-password", account=body.email, limit=30, account_limit=3, window_seconds=3600)
     return auth_crud.create_password_reset_token(db, body.email)
 
 
 @router.post("/reset-password", response_model=MessageResponse, summary="Đặt lại mật khẩu bằng token")
-def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
+def reset_password(request: Request, body: ResetPasswordRequest, db: Session = Depends(get_db)):
     """Xác thực token và cập nhật mật khẩu mới."""
+    enforce_rate_limit(request, "reset-password", account=body.token, limit=60, account_limit=10, window_seconds=3600)
     return auth_crud.reset_user_password(db, body.token, body.new_password)
 
 

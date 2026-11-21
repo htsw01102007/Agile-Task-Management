@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional, Tuple
 from datetime import datetime, timedelta, timezone
+from app.core.time import utc_now_naive
 
 from app.db.session import get_db
 from app.core.deps import get_current_user
@@ -33,8 +34,7 @@ def scan_and_create_deadline_notifications(
     - Đã quá hạn chót -> Tạo thông báo 'task_overdue'
     Đảm bảo không tạo trùng thông báo cùng loại cho cùng (user_id, task_id).
     """
-    now_utc = datetime.now(timezone.utc)
-    now_naive = now_utc.replace(tzinfo=None)
+    now_naive = utc_now_naive()
     soon_threshold = now_naive + timedelta(hours=24)
 
     query = (

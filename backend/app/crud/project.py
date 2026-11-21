@@ -2,6 +2,7 @@ import json
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+from app.core.time import utc_now_naive
 from typing import Optional, Tuple
 from fastapi import HTTPException, status
 from sqlalchemy import func
@@ -197,7 +198,7 @@ def create_project_invitation(
             )
 
     # 2. Chống mời trùng: Kiểm tra trong service xem đã có lời mời pending cho email này chưa
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = utc_now_naive()
     pending_invitations = (
         db.query(ProjectInvitation)
         .filter(

@@ -31,12 +31,14 @@ from app.core.security import (
     hash_reset_token,
 )
 from app.core.config import settings
+from app.core.email import send_password_reset_email
+from app.core.time import utc_now_naive
 from app.core.ws_manager import disconnect_all_for_user_sync
 
 
 def _utc_now_naive() -> datetime:
     """Trả về thời gian UTC hiện tại dạng naive để lưu đồng nhất vào cột DATETIME của MySQL."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return utc_now_naive()
 
 
 def to_user_out(user: User) -> UserOut:
@@ -61,7 +63,7 @@ def ensure_active(user: User) -> None:
 
 
 def issue_tokens(db: Session, user: User) -> TokenResponse:
-    user.last_login_at = _utc_now_naive()
+    user.last_login_at = utc_now_naive()
     db.commit()
     db.refresh(user)
 
@@ -179,14 +181,14 @@ def create_password_reset_token(db: Session, email: str) -> ForgotPasswordRespon
     email_clean = email.lower()
     user = db.query(User).filter(func.lower(User.email) == email_clean).first()
 
-    base_message = "Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được tạo."
+    base_message = "Nếu email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu đã được gửi."
 
     if not user or not user.is_active:
         return ForgotPasswordResponse(message=base_message)
 
     raw_token = generate_reset_token()
     token_hash = hash_reset_token(raw_token)
-    now_naive = _utc_now_naive()
+    now_naive = utc_now_naive()
     expires_at = now_naive + timedelta(minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES)
 
     db.query(PasswordResetToken).filter(
@@ -202,7 +204,18 @@ def create_password_reset_token(db: Session, email: str) -> ForgotPasswordRespon
     db.add(reset_record)
     db.commit()
 
-    token_to_return = raw_token if settings.ENV == "development" else None
+    try:
+        send_password_reset_email(user.email, raw_token)
+    except Exception:
+        # Invalidate the token if delivery failed so no inaccessible reset token remains active.
+        reset_record.used_at = utc_now_naive()
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Hiện chưa thể gửi email đặt lại mật khẩu. Vui lòng thử lại sau.",
+        )
+
+    token_to_return = raw_token if settings.ENV.strip().lower() == "development" else None
     return ForgotPasswordResponse(message=base_message, reset_token=token_to_return)
 
 
@@ -220,11 +233,11 @@ def reset_user_password(db: Session, token_str: str, new_password: str) -> Messa
             detail="Mã đặt lại mật khẩu không hợp lệ hoặc đã được sử dụng"
         )
 
-    now_naive = _utc_now_naive()
+    now_naive = utc_now_naive()
     exp_dt = record.expires_at
     if exp_dt.tzinfo is not None:
         exp_dt = exp_dt.astimezone(timezone.utc).replace(tzinfo=None)
-    if exp_dt < now_naive:
+    if exp_dt <= now_naive:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Mã đặt lại mật khẩu đã hết hạn"

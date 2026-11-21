@@ -1,10 +1,11 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Query
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone
+from app.core.time import utc_now_naive
 
 from app.db.session import get_db
 from app.core.deps import get_current_user
@@ -22,11 +23,14 @@ router = APIRouter(prefix="/invitations", tags=["Invitations"])
 
 @router.get("/me", response_model=List[InvitationResponse])
 def list_my_invitations(
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
 ):
     """Danh sách các lời mời tham gia dự án gửi tới email của người dùng hiện tại"""
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = utc_now_naive()
     invitations = (
         db.query(ProjectInvitation)
         .join(Project, Project.id == ProjectInvitation.project_id)
@@ -34,8 +38,19 @@ def list_my_invitations(
             func.lower(ProjectInvitation.invitee_email) == current_user.email.lower(),
             Project.deleted_at.is_(None),
         )
-        .order_by(ProjectInvitation.created_at.desc())
+        .order_by(ProjectInvitation.created_at.desc(), ProjectInvitation.id.desc())
+        .offset(skip)
+        .limit(limit)
         .all()
+    )
+    response.headers["X-Total-Count"] = str(
+        db.query(ProjectInvitation.id)
+        .join(Project, Project.id == ProjectInvitation.project_id)
+        .filter(
+            func.lower(ProjectInvitation.invitee_email) == current_user.email.lower(),
+            Project.deleted_at.is_(None),
+        )
+        .count()
     )
     changed = False
     for inv in invitations:
@@ -66,7 +81,7 @@ def accept_invitation(
     )
     if invitation.status != "pending":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời không còn hiệu lực")
-    if invitation.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
+    if invitation.expires_at < utc_now_naive():
         invitation.status = "expired"
         db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời đã hết hạn")
@@ -100,7 +115,7 @@ def accept_invitation(
 
     invitation.status = "accepted"
     invitation.invitee_id = current_user.id
-    invitation.responded_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    invitation.responded_at = utc_now_naive()
 
     if invitation.inviter_id is not None:
         db.add(
@@ -148,7 +163,7 @@ def decline_invitation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lời mời không tồn tại")
     if invitation.status != "pending":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời không còn hiệu lực")
-    if invitation.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
+    if invitation.expires_at < utc_now_naive():
         invitation.status = "expired"
         db.commit()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Lời mời đã hết hạn")
@@ -159,7 +174,7 @@ def decline_invitation(
 
     invitation.status = "declined"
     invitation.invitee_id = current_user.id
-    invitation.responded_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    invitation.responded_at = utc_now_naive()
 
     if invitation.inviter_id is not None:
         db.add(
