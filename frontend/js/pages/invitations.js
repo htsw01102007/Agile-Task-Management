@@ -76,4 +76,8 @@ invitationList.addEventListener("click", async (e) => {
   }
 });
 
+window.addEventListener("realtime:notification", () => {
+  loadMyInvitations();
+});
+
 loadMyInvitations();

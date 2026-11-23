@@ -23,7 +23,10 @@ class ApiError extends Error {
 const http = axios.create({
   baseURL: CONFIG.API_BASE_URL,
   timeout: 10000, // quá 10 giây không phản hồi thì báo lỗi
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
+  },
 });
 
 // Gửi access token nếu ứng dụng đã đăng nhập. Giữ "token" để tương thích
