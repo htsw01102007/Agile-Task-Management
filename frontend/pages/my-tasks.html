@@ -25,16 +25,72 @@
 
       <div class="page-heading">
         <div>
-          <p class="eyebrow">CÔNG VIỆC CÁ NHÂN</p>
+          <p class="eyebrow">ĐIỀU PHỐI CÔNG VIỆC CÁ NHÂN</p>
           <h1>Việc của tôi</h1>
-          <p class="muted">Tổng hợp tất cả các công việc được giao cho bạn xuyên suốt mọi dự án.</p>
+          <p class="muted">Tổng hợp tất cả các đầu việc được phân công cho bạn xuyên suốt mọi dự án trong không gian làm việc.</p>
         </div>
-        <button id="check-backend" class="btn" type="button">Kiểm tra kết nối API</button>
+        <button id="check-backend" class="btn" type="button"><span data-icon="activity"></span><span>Kiểm tra trạng thái API</span></button>
       </div>
 
+      <!-- 4 Thẻ thống kê công việc cá nhân -->
+      <section class="overview-grid-4" aria-label="Thống kê việc của tôi">
+        <article class="metric-card">
+          <span class="metric-icon violet" data-icon="layers"></span>
+          <div>
+            <p class="metric-label">Tổng việc hiển thị</p>
+            <strong id="my-stat-total">—</strong>
+          </div>
+          <span class="metric-note">trên trang hiện tại</span>
+        </article>
+
+        <article class="metric-card">
+          <span class="metric-icon amber" data-icon="clock"></span>
+          <div>
+            <p class="metric-label">Đang thực hiện</p>
+            <strong id="my-stat-pending">—</strong>
+          </div>
+          <span class="metric-note">chưa hoàn thành</span>
+        </article>
+
+        <article class="metric-card">
+          <span class="metric-icon emerald" data-icon="tasks"></span>
+          <div>
+            <p class="metric-label">Đã hoàn thành</p>
+            <strong id="my-stat-done">—</strong>
+          </div>
+          <span class="metric-note">đã đóng / cột Done</span>
+        </article>
+
+        <article class="metric-card">
+          <span class="metric-icon rose" data-icon="alert"></span>
+          <div>
+            <p class="metric-label">Đang quá hạn</p>
+            <strong id="my-stat-overdue">—</strong>
+          </div>
+          <span class="metric-note">cần ưu tiên xử lý</span>
+        </article>
+      </section>
+
       <section class="content-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>Danh sách công việc được giao</h2>
+            <p class="muted">Nhấn vào bất kỳ dòng công việc nào để mở trực tiếp cửa sổ chi tiết trong bảng Kanban dự án.</p>
+          </div>
+          <div class="pill-tabs" id="quick-task-tabs">
+            <button class="pill-tab active" type="button" data-quick-filter="all">Tất cả</button>
+            <button class="pill-tab" type="button" data-quick-filter="pending">Đang làm</button>
+            <button class="pill-tab" type="button" data-quick-filter="overdue">Quá hạn</button>
+            <button class="pill-tab" type="button" data-quick-filter="done">Đã xong</button>
+          </div>
+        </div>
+
         <form id="task-filters" class="table-filters">
-          <input name="search" type="search" placeholder="Tìm theo tên công việc…" aria-label="Tìm công việc">
+          <input name="search" type="search" placeholder="Tìm theo tiêu đề công việc…" aria-label="Tìm công việc">
+
+          <select id="my-project-filter" aria-label="Lọc theo dự án">
+            <option value="">Tất cả dự án</option>
+          </select>
 
           <select name="priority" aria-label="Lọc độ ưu tiên">
             <option value="">Mọi độ ưu tiên</option>
@@ -56,7 +112,7 @@
             <option value="false">Trong hạn</option>
           </select>
 
-          <button class="btn btn-primary" type="submit">Áp dụng lọc</button>
+          <button class="btn btn-primary" type="submit">Áp dụng bộ lọc</button>
         </form>
 
         <p id="backend-health-result" class="muted" role="status" hidden></p>

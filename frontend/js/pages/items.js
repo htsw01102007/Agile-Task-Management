@@ -102,7 +102,14 @@ function resetForm() {
 
 // ---------- Xoá ----------
 async function deleteItem(id) {
-  if (!confirm(`Xoá item #${id}?`)) return;
+  const ok = await showConfirmModal({
+    eyebrow: "XOÁ DỮ LIỆU",
+    title: `Xoá item #${id}?`,
+    message: "Dữ liệu này sẽ bị xoá khỏi hệ thống.",
+    confirmText: "Xoá item",
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await api.delete(`/items/${id}`);
     showToast("Đã xoá item");

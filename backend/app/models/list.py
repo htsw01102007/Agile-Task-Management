@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, String, Integer, Boolean, DateTime, ForeignKey, func, UniqueConstraint
+from sqlalchemy import Column, BigInteger, String, Integer, Boolean, DateTime, ForeignKey, Index, func, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 
@@ -16,6 +16,7 @@ class ListModel(Base):
 
     __table_args__ = (
         UniqueConstraint("id", "project_id", name="uq_lists_id_project"),
+        Index("idx_lists_project_position", "project_id", "position"),
     )
 
     # Relationships

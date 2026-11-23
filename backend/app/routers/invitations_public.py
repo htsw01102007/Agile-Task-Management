@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 from app.db.session import get_db
 from app.core.deps import get_current_user
+from app.core.ws_manager import notify_user_sync
 from app.models.user import User
 from app.models.project import Project
 from app.models.project_invitation import ProjectInvitation
@@ -102,18 +103,18 @@ def accept_invitation(
     invitation.invitee_id = current_user.id
     invitation.responded_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
+    notif = None
     if invitation.inviter_id is not None:
-        db.add(
-            Notification(
-                user_id=invitation.inviter_id,
-                type="invitation_accepted",
-                title=f"{current_user.full_name} đã chấp nhận lời mời",
-                message=f"{current_user.full_name} ({current_user.email}) đã tham gia dự án '{project.name}'.",
-                entity_type="invitation",
-                entity_id=invitation.id,
-                project_id=invitation.project_id,
-            )
+        notif = Notification(
+            user_id=invitation.inviter_id,
+            type="invitation_accepted",
+            title=f"{current_user.full_name} đã chấp nhận lời mời",
+            message=f"{current_user.full_name} ({current_user.email}) đã tham gia dự án '{project.name}'.",
+            entity_type="invitation",
+            entity_id=invitation.id,
+            project_id=invitation.project_id,
         )
+        db.add(notif)
     db.add(
         ActivityLog(
             project_id=invitation.project_id,
@@ -131,6 +132,22 @@ def accept_invitation(
         # Thêm project_members và cập nhật lời mời nằm trong cùng transaction -> rollback cả hai
         db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bạn đã là thành viên của dự án")
+
+    if invitation.inviter_id is not None and notif is not None:
+        db.refresh(notif)
+        notify_user_sync(
+            invitation.inviter_id,
+            "notification_created",
+            {
+                "id": notif.id,
+                "type": notif.type,
+                "title": notif.title,
+                "message": notif.message,
+                "entity_type": notif.entity_type,
+                "entity_id": notif.entity_id,
+                "project_id": notif.project_id,
+            },
+        )
     return {
         "message": "Đã chấp nhận lời mời tham gia dự án",
         "project_id": invitation.project_id,
@@ -161,18 +178,33 @@ def decline_invitation(
     invitation.invitee_id = current_user.id
     invitation.responded_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
+    notif = None
     if invitation.inviter_id is not None:
-        db.add(
-            Notification(
-                user_id=invitation.inviter_id,
-                type="invitation_declined",
-                title=f"{current_user.full_name} đã từ chối lời mời",
-                message=f"{current_user.full_name} ({current_user.email}) đã từ chối lời mời vào dự án '{project.name if project else invitation.project_id}'.",
-                entity_type="invitation",
-                entity_id=invitation.id,
-                project_id=invitation.project_id,
-            )
+        notif = Notification(
+            user_id=invitation.inviter_id,
+            type="invitation_declined",
+            title=f"{current_user.full_name} đã từ chối lời mời",
+            message=f"{current_user.full_name} ({current_user.email}) đã từ chối lời mời vào dự án '{project.name if project else invitation.project_id}'.",
+            entity_type="invitation",
+            entity_id=invitation.id,
+            project_id=invitation.project_id,
         )
+        db.add(notif)
 
     db.commit()
+    if invitation.inviter_id is not None and notif is not None:
+        db.refresh(notif)
+        notify_user_sync(
+            invitation.inviter_id,
+            "notification_created",
+            {
+                "id": notif.id,
+                "type": notif.type,
+                "title": notif.title,
+                "message": notif.message,
+                "entity_type": notif.entity_type,
+                "entity_id": notif.entity_id,
+                "project_id": notif.project_id,
+            },
+        )
     return {"message": "Đã từ chối lời mời tham gia dự án"}

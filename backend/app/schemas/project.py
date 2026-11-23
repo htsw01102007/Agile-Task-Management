@@ -47,6 +47,7 @@ class ProjectDetailResponse(ProjectResponse):
     model_config = ConfigDict(from_attributes=True)
 
     completed_task_count: int = 0
+    overdue_task_count: int = 0
     completion_rate: float = 0.0
 
 

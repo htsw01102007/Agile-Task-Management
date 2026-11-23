@@ -1,15 +1,18 @@
 const boardElement = document.getElementById("board");
+const tablePanel = document.getElementById("table-panel");
+const tableBody = document.getElementById("project-table-body");
 const summaryElement = document.getElementById("board-summary");
 const retryButton = document.getElementById("retry-board");
 const newTaskButton = document.getElementById("new-task-button");
 const teamButton = document.getElementById("team-button");
 const searchInput = document.getElementById("task-search");
 const priorityFilter = document.getElementById("priority-filter");
+const assigneeFilter = document.getElementById("assignee-filter");
 const taskDialog = document.getElementById("task-dialog");
 const taskForm = document.getElementById("task-form");
 const teamDialog = document.getElementById("team-dialog");
 const trashDialog = document.getElementById("trash-dialog");
-const priorityNames = { low: "Thấp", medium: "Trung bình", high: "Cao", urgent: "Khẩn" };
+const priorityNames = { low: "Thấp", medium: "Trung bình", high: "Cao", urgent: "Khẩn cấp" };
 
 const requestedProjectId = new URLSearchParams(window.location.search).get("project");
 let projectId = /^\d+$/.test(requestedProjectId || "") ? Number(requestedProjectId) : NaN;
@@ -22,6 +25,7 @@ let currentTask = null;
 let savingTask = false;
 let canEdit = false;
 let canManageLists = false;
+let activeTab = "board";
 
 function initials(name = "?") {
   return name.trim().split(/\s+/).slice(-2).map((part) => part[0]).join("").toUpperCase();
@@ -87,11 +91,33 @@ function taskMarkup(task) {
       ${escapeHtml(lb.label_name)}
     </span>`).join("");
   return `<article class="task-card${completed ? " completed-task" : ""}" tabindex="0" draggable="${canEdit}" data-task-id="${task.id}">
+    <div class="task-card-header">
+      <span class="task-id-badge">#${task.id}</span>
+      <span class="priority priority-${priority}">↑ ${escapeHtml(priorityText(task.priority))}</span>
+    </div>
     ${labelChips ? `<div class="task-labels-row">${labelChips}</div>` : ""}
     <h3>${escapeHtml(task.title)}</h3>
-    <div class="task-card-meta"><span class="priority priority-${priority}">↑ ${escapeHtml(priorityText(task.priority))}</span><span class="task-date${due.overdue ? " overdue" : ""}">${due.text}</span></div>
-    <div class="task-footer">${assigneeMarkup(task.assignees)}</div>
+    ${task.description ? `<p class="task-desc-preview">${escapeHtml(task.description)}</p>` : ""}
+    <div class="task-footer">
+      <span class="task-date${due.overdue ? " overdue" : ""}">${due.text}</span>
+      ${assigneeMarkup(task.assignees)}
+    </div>
   </article>`;
+}
+
+function populateAssigneeFilter() {
+  if (!assigneeFilter || !boardData) return;
+  const current = assigneeFilter.value;
+  const seen = new Map();
+  boardData.tasks.forEach((task) => {
+    (task.assignees || []).forEach((a) => {
+      if (!seen.has(a.user_id)) {
+        seen.set(a.user_id, a.user_full_name || a.user_email || `Thành viên #${a.user_id}`);
+      }
+    });
+  });
+  assigneeFilter.innerHTML = `<option value="">Mọi thành viên</option><option value="unassigned" ${current === "unassigned" ? "selected" : ""}>Chưa giao cho ai</option>`
+    + [...seen.entries()].map(([uid, name]) => `<option value="${uid}" ${String(uid) === current ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
 }
 
 function renderInsights() {
@@ -104,17 +130,65 @@ function renderInsights() {
   const rate = boardData.tasks.length ? Math.round(completed / boardData.tasks.length * 100) : 0;
   document.getElementById("project-progress-label").textContent = `${rate}% hoàn thành`;
   document.getElementById("project-progress").value = rate;
-  document.getElementById("project-counts").textContent = `${completed}/${boardData.tasks.length} công việc`;
+  document.getElementById("project-counts").textContent = `${completed}/${boardData.tasks.length} công việc đã xong`;
+}
+
+function getFilteredTasks() {
+  const query = searchInput.value.trim().toLocaleLowerCase("vi");
+  const selectedPriority = priorityFilter.value;
+  const selectedAssignee = assigneeFilter?.value || "";
+  return boardData.tasks.filter((task) => {
+    const matchQuery = !query
+      || task.title.toLocaleLowerCase("vi").includes(query)
+      || `#${task.id}`.includes(query);
+    const matchPriority = !selectedPriority || task.priority === selectedPriority;
+    let matchAssignee = true;
+    if (selectedAssignee === "unassigned") {
+      matchAssignee = !(task.assignees && task.assignees.length);
+    } else if (selectedAssignee) {
+      matchAssignee = (task.assignees || []).some((a) => String(a.user_id) === selectedAssignee);
+    }
+    return matchQuery && matchPriority && matchAssignee;
+  });
+}
+
+function renderTableView(visibleTasks) {
+  if (!tableBody || !boardData) return;
+  const listMap = new Map(boardData.lists.map((l) => [l.id, l]));
+  if (!visibleTasks.length) {
+    tableBody.innerHTML = '<tr><td colspan="6" class="muted">Không có công việc nào khớp bộ lọc.</td></tr>';
+    return;
+  }
+  tableBody.innerHTML = visibleTasks.map((task) => {
+    const list = listMap.get(task.list_id);
+    const completed = isTaskDone(task);
+    const due = formatDueDate(task.due_date, completed);
+    return `<tr data-table-task-id="${task.id}" style="cursor:pointer;">
+      <td><span class="task-id-badge">#${task.id}</span></td>
+      <td><strong>${escapeHtml(task.title)}</strong></td>
+      <td><span class="role-badge ${completed ? "status-active" : ""}">${escapeHtml(list?.name || "—")}</span></td>
+      <td><span class="priority priority-${escapeHtml(task.priority)}">${escapeHtml(priorityText(task.priority))}</span></td>
+      <td>${assigneeMarkup(task.assignees)}</td>
+      <td><span class="task-date${due.overdue ? " overdue" : ""}">${escapeHtml(due.text)}</span></td>
+    </tr>`;
+  }).join("");
 }
 
 function renderBoard() {
   if (!boardData) return;
-  const query = searchInput.value.trim().toLocaleLowerCase("vi");
-  const selectedPriority = priorityFilter.value;
-  const visibleTasks = boardData.tasks.filter((task) => {
-    return (!query || task.title.toLocaleLowerCase("vi").includes(query))
-      && (!selectedPriority || task.priority === selectedPriority);
+
+  // Lưu lại vị trí cuộn của bảng và từng cột trước khi cập nhật DOM để chống giật/nháy
+  const prevBoardScrollLeft = boardElement.scrollLeft;
+  const prevColScrollTops = new Map();
+  boardElement.querySelectorAll(".board-column[data-list-id]").forEach((col) => {
+    const tasksContainer = col.querySelector(".column-tasks");
+    if (tasksContainer) {
+      prevColScrollTops.set(col.dataset.listId, tasksContainer.scrollTop);
+    }
   });
+
+  populateAssigneeFilter();
+  const visibleTasks = getFilteredTasks();
   const columns = [...boardData.lists].sort((a, b) => a.position - b.position || a.id - b.id);
   boardElement.innerHTML = columns.map((list) => {
     const tasks = visibleTasks.filter((task) => task.list_id === list.id)
@@ -122,18 +196,31 @@ function renderBoard() {
     const content = tasks.length ? tasks.map(taskMarkup).join("")
       : `<p class="board-empty">${visibleTasks.length ? "Chưa có công việc" : "Không có kết quả phù hợp"}</p>`;
     const listActions = canManageLists ? `<span class="column-actions">
-      <button type="button" class="column-action" data-list-action="rename" data-list-id="${list.id}" aria-label="Đổi tên cột">✎</button>
-      <button type="button" class="column-action" data-list-action="done" data-list-id="${list.id}" aria-label="Đặt cột hoàn thành">${list.is_done_column ? "✓" : "○"}</button>
-      <button type="button" class="column-action" data-list-action="delete" data-list-id="${list.id}" aria-label="Xoá cột">⋯</button>
+      <button type="button" class="column-action" data-list-action="rename" data-list-id="${list.id}" title="Đổi tên cột" aria-label="Đổi tên cột">${iconSvg("edit")}</button>
+      <button type="button" class="column-action" data-list-action="done" data-list-id="${list.id}" title="Đặt làm cột Hoàn thành" aria-label="Đặt cột hoàn thành">${list.is_done_column ? iconSvg("check") : iconSvg("circle")}</button>
+      <button type="button" class="column-action" data-list-action="delete" data-list-id="${list.id}" title="Xoá cột" aria-label="Xoá cột">${iconSvg("trash")}</button>
     </span>` : "";
-    const addTask = canEdit ? `<button type="button" class="add-task" data-create-task="${list.id}">＋ Thêm công việc</button>` : "";
+    const addTask = canEdit ? `<button type="button" class="add-task" data-create-task="${list.id}">${iconSvg("plus")} <span>Thêm công việc vào cột này</span></button>` : "";
     return `<section class="board-column${list.is_done_column ? " board-column-done" : ""}" data-list-id="${list.id}" aria-label="${escapeHtml(list.name)}" draggable="${canManageLists}">
       <div class="column-title" ${canManageLists ? 'data-list-drag-handle="true"' : ""}><span class="column-dot${list.is_done_column ? " done-dot" : ""}"></span><strong>${escapeHtml(list.name)}</strong><span class="count">${tasks.length}</span>${listActions}</div>
       <div class="column-tasks">${content}</div>${addTask}
     </section>`;
-  }).join("") + (canManageLists ? '<button type="button" id="add-list-button" class="add-list">＋ Thêm danh sách</button>' : "");
+  }).join("") + (canManageLists ? `<button type="button" id="add-list-button" class="add-list">${iconSvg("plus")} <span>Thêm cột trạng thái mới</span></button>` : "");
+
+  // Khôi phục vị trí cuộn ngay trong cùng frame
+  boardElement.scrollLeft = prevBoardScrollLeft;
+  boardElement.querySelectorAll(".board-column[data-list-id]").forEach((col) => {
+    const savedTop = prevColScrollTops.get(col.dataset.listId);
+    const tasksContainer = col.querySelector(".column-tasks");
+    if (tasksContainer && typeof savedTop === "number") {
+      tasksContainer.scrollTop = savedTop;
+    }
+  });
+
+  renderTableView(visibleTasks);
+
   const completedCount = boardData.tasks.filter(isTaskDone).length;
-  summaryElement.textContent = `${boardData.lists.length} cột · ${visibleTasks.length} công việc${visibleTasks.length !== boardData.tasks.length ? ` (lọc từ ${boardData.tasks.length})` : ""} · Hoàn thành ${boardData.tasks.length ? Math.round(completedCount / boardData.tasks.length * 100) : 0}%`;
+  summaryElement.textContent = `${boardData.lists.length} cột · Hiển thị ${visibleTasks.length}/${boardData.tasks.length} công việc · Tiến độ ${boardData.tasks.length ? Math.round(completedCount / boardData.tasks.length * 100) : 0}%`;
   renderInsights();
 }
 
@@ -141,9 +228,12 @@ function renderProject() {
   document.title = `${projectData.name} | Agile Workspace`;
   document.getElementById("project-title").textContent = projectData.name;
   document.getElementById("project-crumb").textContent = projectData.name;
-  document.getElementById("project-description").textContent = projectData.description || "";
+  document.getElementById("project-description").textContent = projectData.description || "Chưa có mô tả chi tiết cho dự án này.";
   document.getElementById("project-mark").textContent = initials(projectData.name);
   document.getElementById("project-status").textContent = statusText(projectData.status);
+  const roleBadge = document.getElementById("project-role-badge");
+  if (roleBadge) roleBadge.textContent = `Vai trò: ${(projectData.user_role || "member").toUpperCase()}`;
+
   const active = projectData.status === "active";
   canEdit = active && ["owner", "manager", "member"].includes(projectData.user_role);
   canManageLists = active && ["owner", "manager"].includes(projectData.user_role);
@@ -171,14 +261,17 @@ async function resolveProjectId() {
   return projectId;
 }
 
-async function loadBoard() {
-  renderLoading();
+async function loadBoard({ showSkeleton = false } = {}) {
+  // Chỉ hiện khung xương (skeleton) ở lần tải đầu tiên khi chưa có dữ liệu bảng
+  if (!boardData || showSkeleton) {
+    renderLoading();
+  }
   try {
     const id = await resolveProjectId();
     const [project, board, user] = await Promise.all([
       api.get(`/projects/${id}`),
       api.get(`/projects/${id}/board`),
-      api.get("/auth/me"),
+      currentUser ? Promise.resolve(currentUser) : api.get("/auth/me"),
     ]);
     projectData = project;
     boardData = board;
@@ -186,17 +279,20 @@ async function loadBoard() {
     renderProject();
     renderBoard();
     if (window.location.hash === "#activity") setProjectTab("activity");
+    else if (window.location.hash === "#table") setProjectTab("table");
     boardElement.setAttribute("aria-busy", "false");
     const taskId = Number(new URLSearchParams(window.location.search).get("task"));
     if (Number.isSafeInteger(taskId) && taskId > 0 && !taskDialog.open) await openTask(taskId, false);
   } catch (error) {
     boardElement.setAttribute("aria-busy", "false");
-    const loginLink = error.status === 401
-      ? `<a href="../pages/login.html?next=${encodeURIComponent(window.location.pathname + window.location.search)}">Đăng nhập để xem bảng dự án</a>`
-      : '<a href="../index.html">Về danh sách dự án</a>';
-    boardElement.innerHTML = `<div class="board-load-error"><strong>Không tải được bảng công việc.</strong><span>${escapeHtml(error.message)}</span>${loginLink}</div>`;
-    summaryElement.textContent = "Đã xảy ra lỗi khi tải dữ liệu.";
-    retryButton.hidden = false;
+    if (!boardData) {
+      const loginLink = error.status === 401
+        ? `<a href="../pages/login.html?next=${encodeURIComponent(window.location.pathname + window.location.search)}">Đăng nhập để xem bảng dự án</a>`
+        : '<a href="../index.html">Về danh sách dự án</a>';
+      boardElement.innerHTML = `<div class="board-load-error"><strong>Không tải được bảng công việc.</strong><span>${escapeHtml(error.message)}</span>${loginLink}</div>`;
+      summaryElement.textContent = "Đã xảy ra lỗi khi tải dữ liệu.";
+      retryButton.hidden = false;
+    }
     if (error.status === 401) window.location.assign(`../pages/login.html?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
   }
 }
@@ -251,12 +347,12 @@ function setTaskFormReadOnly(readOnly) {
 function openTaskForm(listId, task = null) {
   currentTask = task;
   taskForm.reset();
-  document.getElementById("task-dialog-title").textContent = task ? task.title : "Tạo công việc";
-  document.getElementById("task-dialog-context").textContent = task ? `CÔNG VIỆC #${task.id}` : "CÔNG VIỆC MỚI";
+  document.getElementById("task-dialog-title").textContent = task ? task.title : "Tạo công việc mới";
+  document.getElementById("task-dialog-context").textContent = task ? `CÔNG VIỆC #${task.id}` : "KHỞI TẠO CÔNG VIỆC";
   document.getElementById("task-submit").textContent = task ? "Lưu thay đổi" : "Tạo công việc";
   document.getElementById("task-delete").hidden = !task || !canDeleteTask(task);
   document.getElementById("task-completed-at").textContent = task?.completed_at ? `Hoàn thành: ${formatDueDate(task.completed_at, true).text}` : "";
-  document.getElementById("task-created-by").textContent = task ? `Người tạo: ${task.creator_name || `#${task.created_by}`}` : "";
+  document.getElementById("task-created-by").textContent = task ? `Mã người tạo: #${task.created_by}` : "";
   taskForm.elements.title.value = task?.title || "";
   taskForm.elements.description.value = task?.description || "";
   taskForm.elements.priority.value = task?.priority || "medium";
@@ -321,11 +417,10 @@ async function syncLabels(taskId, selectedIds) {
 }
 
 document.getElementById("create-label-btn")?.addEventListener("click", async () => {
-  const name = prompt("Nhập tên nhãn mới (ví dụ: Backend, Bug, UI/UX):")?.trim();
-  if (!name) return;
-  const color = prompt("Nhập mã màu Hex (mặc định #2563EB):", "#2563EB")?.trim() || "#2563EB";
+  const modalResult = await showLabelModal();
+  if (!modalResult) return;
   try {
-    const created = await api.post(`/projects/${projectId}/labels`, { name, color });
+    const created = await api.post(`/projects/${projectId}/labels`, modalResult);
     projectLabels.push(created);
     const currentSelected = selectedLabelIds();
     currentSelected.push(created.id);
@@ -345,7 +440,7 @@ taskForm.addEventListener("submit", async (event) => {
   try {
     const payload = buildTaskPayload();
     if (payload.start_date && payload.due_date && new Date(payload.due_date) < new Date(payload.start_date)) {
-      showToast("Hạn chót không được sớm hơn ngày bắt đầu", "error");
+      setFieldError(taskForm.elements.due_date, "Hạn hoàn thành không được sớm hơn thời gian bắt đầu.");
       return;
     }
     if (currentTask) {
@@ -375,7 +470,9 @@ taskForm.addEventListener("submit", async (event) => {
       await openTask(created.id);
     }
   } catch (error) {
-    showToast(error.message, "error");
+    if (!applyApiErrorsToForm(taskForm, error)) {
+      showToast(error.message, "error");
+    }
   } finally {
     savingTask = false;
     submitButton.disabled = false;
@@ -406,10 +503,17 @@ window.addEventListener("popstate", () => {
 
 document.getElementById("task-delete").addEventListener("click", async () => {
   if (!currentTask || !canDeleteTask(currentTask)) return;
-  if (!confirm(`Xoá công việc "${currentTask.title}"? Công việc sẽ được chuyển vào thùng rác.`)) return;
+  const ok = await showConfirmModal({
+    eyebrow: "XOÁ CÔNG VIỆC",
+    title: `Xoá "${currentTask.title}"?`,
+    message: "Công việc sẽ được chuyển vào thùng rác của dự án và có thể khôi phục lại sau.",
+    confirmText: "Chuyển vào thùng rác",
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await api.delete(`/projects/${projectId}/tasks/${currentTask.id}`);
-    showToast("Đã xoá công việc");
+    showToast("Đã chuyển công việc vào thùng rác");
     closeTaskDialog();
     await loadBoard();
   } catch (error) {
@@ -423,8 +527,8 @@ async function loadDeletedTasks() {
   try {
     const deleted = await api.get(`/projects/${projectId}/tasks/deleted`);
     container.innerHTML = deleted.length ? deleted.map((task) => `
-      <div class="team-row"><span class="team-person"><strong>${escapeHtml(task.title)}</strong><small>Đã xoá ${escapeHtml(task.deleted_at ? formatDateTime(task.deleted_at) : "")}</small></span><button class="btn btn-small" type="button" data-restore-task="${task.id}">Khôi phục</button></div>`).join("")
-      : '<p class="muted">Thùng rác đang trống.</p>';
+      <div class="team-row"><span class="team-person"><strong>#${task.id} · ${escapeHtml(task.title)}</strong><small>Đã xoá ${escapeHtml(task.deleted_at ? formatDateTime(task.deleted_at) : "")}</small></span><button class="btn btn-small btn-primary" type="button" data-restore-task="${task.id}">Khôi phục</button></div>`).join("")
+      : '<p class="empty-state">Thùng rác đang trống.</p>';
   } catch (error) {
     container.innerHTML = `<p class="status status-error">${escapeHtml(error.message)}</p>`;
   }
@@ -473,21 +577,21 @@ function renderChecklist(summary) {
   document.getElementById("checklist-items").innerHTML = summary.items.length ? summary.items.map((item) => `
     <div class="checklist-item" data-checklist-id="${item.id}">
       <input type="checkbox" ${item.is_done ? "checked" : ""} ${canEdit ? "" : "disabled"}>
-      <span>${escapeHtml(item.content)}</span>
+      <span style="${item.is_done ? "text-decoration:line-through;color:var(--muted);" : ""}">${escapeHtml(item.content)}</span>
       ${canEdit ? `<button type="button" class="column-action" data-checklist-delete="${item.id}" aria-label="Xoá mục">×</button>` : ""}
-    </div>`).join("") : '<p class="muted">Chưa có mục checklist.</p>';
+    </div>`).join("") : '<p class="muted">Chưa có mục checklist nào.</p>';
   document.getElementById("checklist-form").hidden = !canEdit;
 }
 
 function renderComments(comments) {
   document.getElementById("task-comments").innerHTML = comments.length ? comments.map((comment) => `
-    <article class="task-comment"><span class="comment-avatar">${escapeHtml(initials(comment.user_full_name || "Người dùng"))}</span><div><strong>${escapeHtml(comment.user_full_name || "Tài khoản")}</strong><time>${escapeHtml(formatDateTime(comment.created_at))}</time><p>${escapeHtml(comment.content)}</p></div></article>`).join("") : '<p class="muted">Chưa có bình luận.</p>';
+    <article class="task-comment"><span class="comment-avatar">${escapeHtml(initials(comment.user_full_name || "Người dùng"))}</span><div><strong>${escapeHtml(comment.user_full_name || "Tài khoản")}</strong><time>${escapeHtml(formatDateTime(comment.created_at))}</time><p>${escapeHtml(comment.content)}</p></div></article>`).join("") : '<p class="muted">Chưa có bình luận nào.</p>';
   document.getElementById("comment-form").hidden = !canEdit;
 }
 
 function renderAttachments(attachments) {
   document.getElementById("task-attachments").innerHTML = attachments.length ? attachments.map((attachment) => `
-    <div class="attachment-row"><span>▤</span><span class="team-person"><strong>${escapeHtml(attachment.file_name)}</strong><small>${(attachment.file_size / 1024).toFixed(1)} KB · ${escapeHtml(attachment.user_full_name || attachment.user_email || "Tài khoản")}</small></span>
+    <div class="attachment-row"><span>${iconSvg("file")}</span><span class="team-person"><strong>${escapeHtml(attachment.file_name)}</strong><small>${(attachment.file_size / 1024).toFixed(1)} KB · ${escapeHtml(attachment.user_full_name || attachment.user_email || "Tài khoản")}</small></span>
       <button class="btn btn-small" type="button" data-download-attachment="${attachment.id}">Tải xuống</button>
       ${canEdit && (attachment.user_id === currentUser.id || ["owner", "manager"].includes(projectData.user_role)) ? `<button class="btn btn-small btn-danger" type="button" data-delete-attachment="${attachment.id}">Xoá</button>` : ""}
     </div>`).join("") : '<p class="muted">Chưa có tệp đính kèm.</p>';
@@ -524,7 +628,14 @@ document.getElementById("task-attachments").addEventListener("click", async (eve
   if (!currentTask) return;
   try {
     if (remove) {
-      if (!confirm("Xoá tệp đính kèm này?")) return;
+      const ok = await showConfirmModal({
+        eyebrow: "TỆP ĐÍNH KÈM",
+        title: "Xoá tệp đính kèm?",
+        message: "Tệp đính kèm này sẽ bị xoá vĩnh viễn khỏi công việc.",
+        confirmText: "Xoá tệp",
+        danger: true,
+      });
+      if (!ok) return;
       await api.delete(`/projects/${projectId}/tasks/${currentTask.id}/attachments/${remove.dataset.deleteAttachment}`);
       showToast("Đã xoá tệp đính kèm");
       renderAttachments(await api.get(`/projects/${projectId}/tasks/${currentTask.id}/attachments`));
@@ -547,7 +658,13 @@ document.getElementById("task-attachments").addEventListener("click", async (eve
 document.getElementById("checklist-form").querySelector("button").addEventListener("click", async () => {
   const input = document.getElementById("checklist-form").querySelector('[name="content"]');
   const content = input.value.trim();
-  if (!content || !currentTask) return;
+  if (!content) {
+    setFieldError(input, "Vui lòng nhập nội dung mục checklist.");
+    input.focus();
+    return;
+  }
+  clearFieldError(input);
+  if (!currentTask) return;
   try {
     await api.post(`/projects/${projectId}/tasks/${currentTask.id}/checklist`, { content });
     input.value = "";
@@ -572,7 +689,15 @@ document.getElementById("checklist-items").addEventListener("change", async (eve
 
 document.getElementById("checklist-items").addEventListener("click", async (event) => {
   const button = event.target.closest("[data-checklist-delete]");
-  if (!button || !currentTask || !confirm("Xoá mục checklist này?")) return;
+  if (!button || !currentTask) return;
+  const ok = await showConfirmModal({
+    eyebrow: "CHECKLIST",
+    title: "Xoá mục kiểm tra?",
+    message: "Bạn có chắc chắn muốn xoá mục này khỏi danh sách kiểm tra?",
+    confirmText: "Xoá mục",
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await api.delete(`/projects/${projectId}/tasks/${currentTask.id}/checklist/${button.dataset.checklistDelete}`);
     renderChecklist(await api.get(`/projects/${projectId}/tasks/${currentTask.id}/checklist/summary`));
@@ -584,7 +709,13 @@ document.getElementById("checklist-items").addEventListener("click", async (even
 document.getElementById("comment-form").querySelector("button").addEventListener("click", async () => {
   const input = document.getElementById("comment-form").querySelector('[name="content"]');
   const content = input.value.trim();
-  if (!content || !currentTask) return;
+  if (!content) {
+    setFieldError(input, "Vui lòng nhập nội dung bình luận.");
+    input.focus();
+    return;
+  }
+  clearFieldError(input);
+  if (!currentTask) return;
   try {
     await api.post(`/projects/${projectId}/tasks/${currentTask.id}/comments`, { content });
     input.value = "";
@@ -656,7 +787,7 @@ document.getElementById("invite-form").addEventListener("submit", async (event) 
     });
     const inviteUrl = new URL(`../pages/invitation.html?token=${encodeURIComponent(invitation.raw_token)}`, window.location.href).href;
     const result = document.getElementById("invite-result");
-    result.innerHTML = `<strong>Đã tạo lời mời cho ${escapeHtml(invitation.invitee_email)}.</strong><p>Hết hạn: ${escapeHtml(new Date(invitation.expires_at).toLocaleDateString("vi-VN"))}</p><input readonly value="${escapeHtml(inviteUrl)}"><button class="btn btn-small" type="button" id="copy-invite-link">Sao chép liên kết</button><small>Chia sẻ liên kết này an toàn với người được mời; hệ thống chưa cấu hình gửi email tự động.</small>`;
+    result.innerHTML = `<strong>Đã tạo lời mời cho ${escapeHtml(invitation.invitee_email)}.</strong><p>Hết hạn: ${escapeHtml(new Date(invitation.expires_at).toLocaleDateString("vi-VN"))}</p><input readonly value="${escapeHtml(inviteUrl)}"><button class="btn btn-small btn-primary" type="button" id="copy-invite-link">Sao chép liên kết</button><small>Chia sẻ liên kết này với người được mời hoặc bảo họ kiểm tra mục "Lời mời dự án".</small>`;
     result.hidden = false;
     document.getElementById("copy-invite-link").addEventListener("click", async () => {
       await navigator.clipboard.writeText(inviteUrl);
@@ -665,7 +796,9 @@ document.getElementById("invite-form").addEventListener("submit", async (event) 
     form.reset();
     await openTeamDialog();
   } catch (error) {
-    showToast(error.message, "error");
+    if (!applyApiErrorsToForm(form, error)) {
+      showToast(error.message, "error");
+    }
   }
 });
 
@@ -687,7 +820,14 @@ document.getElementById("project-members").addEventListener("click", async (even
   if (transferButton) {
     const userId = Number(transferButton.dataset.transferOwner);
     const member = members.find((item) => item.user_id === userId);
-    if (!member || !confirm(`Chuyển quyền Owner cho ${member.user?.full_name || member.user?.email}? Bạn sẽ trở thành Manager.`)) return;
+    if (!member) return;
+    const ok = await showConfirmModal({
+      eyebrow: "CHUYỂN QUYỀN SỞ HỮU",
+      title: "Chuyển quyền Owner dự án?",
+      message: `Bạn sắp chuyển quyền Owner cho ${member.user?.full_name || member.user?.email}. Sau khi chuyển, vai trò của bạn sẽ trở thành Manager.`,
+      confirmText: "Xác nhận chuyển Owner",
+    });
+    if (!ok) return;
     try {
       await api.post(`/projects/${projectId}/members/${userId}/transfer-ownership`);
       showToast("Đã chuyển quyền Owner");
@@ -700,7 +840,14 @@ document.getElementById("project-members").addEventListener("click", async (even
   }
   const button = event.target.closest("[data-remove-member]");
   if (!button) return;
-  if (!confirm("Xoá thành viên này khỏi dự án?")) return;
+  const ok = await showConfirmModal({
+    eyebrow: "THÀNH VIÊN DỰ ÁN",
+    title: "Xoá thành viên khỏi dự án?",
+    message: "Thành viên này sẽ không còn quyền truy cập bảng công việc của dự án.",
+    confirmText: "Xoá thành viên",
+    danger: true,
+  });
+  if (!ok) return;
   try {
     await api.delete(`/projects/${projectId}/members/${button.dataset.removeMember}`);
     showToast("Đã xoá thành viên khỏi dự án");
@@ -729,17 +876,23 @@ document.getElementById("project-invitations").addEventListener("click", async (
 });
 
 function setProjectTab(tab) {
-  const activity = tab === "activity";
-  document.querySelector(".board-toolbar").hidden = activity;
-  boardElement.hidden = activity;
-  document.getElementById("activity-panel").hidden = !activity;
+  activeTab = tab;
+  const isActivity = tab === "activity";
+  const isTable = tab === "table";
+  const isBoard = tab === "board";
+
+  document.querySelector(".board-toolbar").hidden = isActivity;
+  boardElement.hidden = !isBoard;
+  if (tablePanel) tablePanel.hidden = !isTable;
+  document.getElementById("activity-panel").hidden = !isActivity;
+
   document.querySelectorAll("[data-project-tab]").forEach((link) => {
     const active = link.dataset.projectTab === tab;
     link.classList.toggle("active", active);
     if (active) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
-  if (activity) loadActivity();
+  if (isActivity) loadActivity();
 }
 
 async function loadActivity() {
@@ -751,8 +904,8 @@ async function loadActivity() {
       <article class="activity-row"><span class="activity-mark">${escapeHtml(initials(log.user_full_name || "U"))}</span>
         <div><strong>${escapeHtml(log.user_full_name || "Tài khoản")}</strong> <span>${escapeHtml(log.action.replaceAll("_", " "))} · ${escapeHtml(log.entity_type)}</span>
           <time>${escapeHtml(formatDateTime(log.created_at))}</time>
-          ${log.new_value ? `<details><summary>Chi tiết</summary><pre>${escapeHtml(log.new_value)}</pre></details>` : ""}
-        </div></article>`).join("") : '<p class="muted">Chưa có hoạt động nào.</p>';
+          ${log.new_value ? `<details><summary>Xem dữ liệu thay đổi</summary><pre>${escapeHtml(log.new_value)}</pre></details>` : ""}
+        </div></article>`).join("") : '<p class="empty-state">Chưa có hoạt động nào được ghi nhận.</p>';
   } catch (error) {
     container.innerHTML = `<p class="status status-error">${escapeHtml(error.message)}</p>`;
   }
@@ -763,8 +916,6 @@ document.querySelector(".tabs").addEventListener("click", (event) => {
   if (!link) return;
   event.preventDefault();
   if (link.dataset.projectTab === "members") {
-    setProjectTab("board");
-    window.history.replaceState({}, "", `${window.location.pathname}${window.location.search}#board`);
     openTeamDialog();
     return;
   }
@@ -772,31 +923,45 @@ document.querySelector(".tabs").addEventListener("click", (event) => {
   window.history.replaceState({}, "", `${window.location.pathname}${window.location.search}#${link.dataset.projectTab}`);
 });
 
+tableBody?.addEventListener("click", (event) => {
+  const row = event.target.closest("[data-table-task-id]");
+  if (row) openTask(Number(row.dataset.tableTaskId));
+});
 
 async function handleListAction(action, listId) {
   const list = boardData.lists.find((item) => item.id === listId);
   if (!list) return;
   try {
     if (action === "rename") {
-      const name = prompt("Tên danh sách mới:", list.name)?.trim();
+      const name = await showPromptModal({
+        eyebrow: "CỘT TRẠNG THÁI KANBAN",
+        title: "Đổi tên cột công việc",
+        description: "Nhập tên mới cho cột trạng thái trên bảng Kanban của dự án.",
+        label: "Tên cột trạng thái *",
+        defaultValue: list.name,
+        placeholder: "VD: Cần làm, Đang triển khai, Kiểm thử…",
+        maxlength: 100,
+        submitText: "Lưu tên cột",
+        requiredMessage: "Vui lòng nhập tên cột trạng thái.",
+      });
       if (!name || name === list.name) return;
       await api.put(`/projects/${projectId}/lists/${listId}`, { name });
+      showToast(`Đã đổi tên cột thành "${name}"`);
     } else if (action === "done") {
       await api.put(`/projects/${projectId}/lists/${listId}`, { is_done_column: !list.is_done_column });
     } else if (action === "delete") {
       const otherLists = boardData.lists.filter((item) => item.id !== listId);
       if (!otherLists.length) return showToast("Dự án phải còn ít nhất một danh sách", "error");
-      const target = list.is_done_column ? null : otherLists[0];
       if (list.is_done_column) return showToast("Không thể xoá cột hoàn thành duy nhất", "error");
-      if (boardData.tasks.some((task) => task.list_id === listId)) {
-        const choices = otherLists.map((item) => `${item.id}: ${item.name}`).join("\n");
-        const targetId = Number(prompt(`Chọn ID danh sách nhận công việc:\n${choices}`, String(target.id)));
-        if (!otherLists.some((item) => item.id === targetId)) return;
-        await api.delete(`/projects/${projectId}/lists/${listId}?target_list_id=${targetId}`);
+      const hasTasks = boardData.tasks.some((task) => task.list_id === listId);
+      const { confirmed, targetListId } = await showDeleteListModal(list, otherLists, hasTasks);
+      if (!confirmed) return;
+      if (hasTasks && targetListId) {
+        await api.delete(`/projects/${projectId}/lists/${listId}?target_list_id=${targetListId}`);
       } else {
-        if (!confirm(`Xoá danh sách "${list.name}"?`)) return;
         await api.delete(`/projects/${projectId}/lists/${listId}`);
       }
+      showToast(`Đã xoá cột "${list.name}"`);
     }
     await loadBoard();
   } catch (error) {
@@ -814,10 +979,20 @@ boardElement.addEventListener("click", async (event) => {
     return openTaskForm(Number(addTask.dataset.createTask));
   }
   if (event.target.closest("#add-list-button")) {
-    const name = prompt("Tên danh sách mới:")?.trim();
+    const name = await showPromptModal({
+      eyebrow: "CỘT TRẠNG THÁI KANBAN",
+      title: "Thêm cột trạng thái mới",
+      description: "Tạo cột mới để phân chia giai đoạn xử lý công việc trên bảng Kanban.",
+      label: "Tên cột trạng thái *",
+      placeholder: "VD: Đang kiểm thử (QA), Chờ nghiệm thu…",
+      maxlength: 100,
+      submitText: "＋ Tạo cột mới",
+      requiredMessage: "Vui lòng nhập tên cột trạng thái mới.",
+    });
     if (!name) return;
     try {
       await api.post(`/projects/${projectId}/lists`, { name });
+      showToast(`Đã thêm cột "${name}"`);
       await loadBoard();
     } catch (error) {
       showToast(error.message, "error");
@@ -837,6 +1012,16 @@ boardElement.addEventListener("keydown", (event) => {
 
 let draggedTask = null;
 let draggedListId = null;
+let activeDropColumn = null;
+
+function clearDropTargetHighlight() {
+  if (activeDropColumn) {
+    activeDropColumn.classList.remove("drop-target");
+    activeDropColumn = null;
+  }
+  boardElement.querySelectorAll(".drop-target").forEach((el) => el.classList.remove("drop-target"));
+}
+
 boardElement.addEventListener("dragstart", (event) => {
   const task = event.target.closest(".task-card");
   const column = event.target.closest(".board-column");
@@ -855,7 +1040,8 @@ boardElement.addEventListener("dragstart", (event) => {
 });
 
 boardElement.addEventListener("dragend", () => {
-  boardElement.querySelectorAll(".dragging, .drop-target").forEach((element) => element.classList.remove("dragging", "drop-target"));
+  boardElement.querySelectorAll(".dragging").forEach((element) => element.classList.remove("dragging"));
+  clearDropTargetHighlight();
   draggedTask = null;
   draggedListId = null;
 });
@@ -864,50 +1050,88 @@ boardElement.addEventListener("dragover", (event) => {
   const column = event.target.closest(".board-column");
   if (column && (draggedTask || draggedListId)) {
     event.preventDefault();
-    column.classList.add("drop-target");
+    event.dataTransfer.dropEffect = "move";
+    if (activeDropColumn !== column) {
+      if (activeDropColumn) activeDropColumn.classList.remove("drop-target");
+      column.classList.add("drop-target");
+      activeDropColumn = column;
+    }
   }
 });
 
 boardElement.addEventListener("dragleave", (event) => {
-  const column = event.target.closest(".board-column");
-  if (column && !column.contains(event.relatedTarget)) column.classList.remove("drop-target");
+  if (!boardElement.contains(event.relatedTarget)) {
+    clearDropTargetHighlight();
+  }
 });
 
 boardElement.addEventListener("drop", async (event) => {
   const column = event.target.closest(".board-column");
+  clearDropTargetHighlight();
   if (!column) return;
   event.preventDefault();
-  column.classList.remove("drop-target");
+
   if (draggedTask && canEdit) {
     const task = draggedTask;
+    draggedTask = null;
     const targetListId = Number(column.dataset.listId);
     if (task.list_id === targetListId) return;
-    const sourceListId = task.list_id;
-    task.list_id = targetListId;
+
+    const prevListId = task.list_id;
+    const prevPosition = task.position;
+    const prevCompletedAt = task.completed_at;
+
+    const targetList = boardData.lists.find((l) => l.id === targetListId);
     const siblings = boardData.tasks.filter((item) => item.list_id === targetListId && item.id !== task.id);
+
+    // Cập nhật giao diện tức thì (Optimistic UI) — không gọi renderLoading() để tránh nháy trang
+    task.list_id = targetListId;
     task.position = siblings.length;
+    if (targetList?.is_done_column) {
+      task.completed_at = task.completed_at || new Date().toISOString();
+    } else {
+      task.completed_at = null;
+    }
     renderBoard();
+
     try {
-      await api.patch(`/projects/${projectId}/tasks/${task.id}/move`, { list_id: targetListId, position: task.position });
-      await loadBoard();
+      const updated = await api.patch(`/projects/${projectId}/tasks/${task.id}/move`, {
+        list_id: targetListId,
+        position: task.position,
+      });
+      if (updated) {
+        Object.assign(task, updated);
+        renderInsights();
+        renderTableView(getFilteredTasks());
+      }
     } catch (error) {
+      // Hoàn tác nếu lỗi mạng hoặc phân quyền
+      task.list_id = prevListId;
+      task.position = prevPosition;
+      task.completed_at = prevCompletedAt;
+      renderBoard();
       showToast(error.message, "error");
-      await loadBoard();
     }
     return;
   }
+
   if (draggedListId && canManageLists) {
-    const from = boardData.lists.findIndex((list) => list.id === draggedListId);
+    const movingListId = draggedListId;
+    draggedListId = null;
+    const from = boardData.lists.findIndex((list) => list.id === movingListId);
     const to = boardData.lists.findIndex((list) => list.id === Number(column.dataset.listId));
     if (from < 0 || to < 0 || from === to) return;
-    const previous = [...boardData.lists];
+
+    const previous = boardData.lists.map((item) => ({ ...item }));
     const [list] = boardData.lists.splice(from, 1);
     boardData.lists.splice(to, 0, list);
     boardData.lists.forEach((item, index) => { item.position = index; });
     renderBoard();
+
     try {
-      await api.patch(`/projects/${projectId}/lists/reorder`, { list_ids: boardData.lists.map((item) => item.id) });
-      await loadBoard();
+      await api.patch(`/projects/${projectId}/lists/reorder`, {
+        list_ids: boardData.lists.map((item) => item.id),
+      });
     } catch (error) {
       boardData.lists = previous;
       renderBoard();
@@ -924,6 +1148,7 @@ newTaskButton.addEventListener("click", async () => {
 retryButton.addEventListener("click", loadBoard);
 searchInput.addEventListener("input", renderBoard);
 priorityFilter.addEventListener("change", renderBoard);
+assigneeFilter?.addEventListener("change", renderBoard);
 document.querySelector(".header-search input")?.addEventListener("input", (event) => {
   searchInput.value = event.target.value;
   renderBoard();
