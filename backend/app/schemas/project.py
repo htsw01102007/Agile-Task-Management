@@ -47,6 +47,7 @@ class ProjectDetailResponse(ProjectResponse):
     model_config = ConfigDict(from_attributes=True)
 
     completed_task_count: int = 0
+    overdue_task_count: int = 0
     completion_rate: float = 0.0
 
 
@@ -59,3 +60,47 @@ class ProjectDashboardSummaryResponse(BaseModel):
 class ProjectBoardResponse(BaseModel):
     lists: List[ListResponse] = []
     tasks: List[TaskDetailResponse] = []
+
+
+class ProjectStatusStat(BaseModel):
+    list_id: int
+    list_name: str
+    is_done_column: bool = False
+    task_count: int = 0
+    percentage: float = 0.0
+
+
+class ProjectMemberStat(BaseModel):
+    user_id: int
+    full_name: str
+    email: str
+    avatar_url: Optional[str] = None
+    role: str
+    total_tasks: int = 0
+    completed_tasks: int = 0
+    in_progress_tasks: int = 0
+    overdue_tasks: int = 0
+    completion_rate: float = 0.0
+
+
+class ProjectOverdueTaskItem(BaseModel):
+    id: int
+    title: str
+    list_id: int
+    list_name: str
+    priority: str
+    due_date: datetime
+    assignee_names: List[str] = []
+
+
+class ProjectStatsResponse(BaseModel):
+    project_id: int
+    total_tasks: int = 0
+    completed_tasks: int = 0
+    in_progress_tasks: int = 0
+    overdue_tasks: int = 0
+    unassigned_tasks: int = 0
+    completion_rate: float = 0.0
+    by_status: List[ProjectStatusStat] = []
+    by_member: List[ProjectMemberStat] = []
+    overdue_task_items: List[ProjectOverdueTaskItem] = []

@@ -77,3 +77,112 @@ def test_project_crud_my_role_and_member_permissions(client, test_user_factory):
     assert client.get("/api/admin/users", headers=owner["headers"]).status_code == 403
 
 
+
+def test_project_stats_endpoint(client, test_user_factory):
+    from datetime import datetime, timedelta, timezone
+
+    owner = test_user_factory("stats_owner")
+    member = test_user_factory("stats_member")
+    viewer = test_user_factory("stats_viewer")
+    outsider = test_user_factory("stats_outsider")
+
+    proj_resp = client.post(
+        "/api/projects",
+        headers=owner["headers"],
+        json={"name": "Stats Test Project"},
+    )
+    assert proj_resp.status_code == 201, proj_resp.text
+    project_id = proj_resp.json()["id"]
+    test_user_factory.track_project(project_id)
+
+    test_user_factory.invite_member(owner["headers"], project_id, member, role="member")
+    test_user_factory.invite_member(owner["headers"], project_id, viewer, role="viewer")
+
+    lists = client.get(f"/api/projects/{project_id}/lists", headers=owner["headers"]).json()
+    todo_list = lists[0]
+    in_progress_list = lists[1]
+    done_list = next(l for l in lists if l["is_done_column"])
+
+    past_due = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+    future_due = (datetime.now(timezone.utc) + timedelta(days=3)).isoformat()
+
+    # 1) Overdue task in todo, assigned to member
+    assert client.post(
+        f"/api/projects/{project_id}/tasks",
+        headers=owner["headers"],
+        json={
+            "title": "Overdue Task",
+            "list_id": todo_list["id"],
+            "priority": "urgent",
+            "due_date": past_due,
+            "assignee_ids": [member["id"]],
+        },
+    ).status_code == 201
+
+    # 2) Active task in in_progress, assigned to owner & member
+    assert client.post(
+        f"/api/projects/{project_id}/tasks",
+        headers=owner["headers"],
+        json={
+            "title": "Active Task",
+            "list_id": in_progress_list["id"],
+            "due_date": future_due,
+            "assignee_ids": [owner["id"], member["id"]],
+        },
+    ).status_code == 201
+
+    # 3) Completed task in done list with past due_date (should NOT count as overdue)
+    assert client.post(
+        f"/api/projects/{project_id}/tasks",
+        headers=owner["headers"],
+        json={
+            "title": "Done Task",
+            "list_id": done_list["id"],
+            "due_date": past_due,
+            "assignee_ids": [owner["id"]],
+        },
+    ).status_code == 201
+
+    # 4) Unassigned task in todo
+    assert client.post(
+        f"/api/projects/{project_id}/tasks",
+        headers=owner["headers"],
+        json={"title": "Unassigned Task", "list_id": todo_list["id"]},
+    ).status_code == 201
+
+    # Viewer can fetch stats; outsider cannot
+    assert client.get(f"/api/projects/{project_id}/stats", headers=outsider["headers"]).status_code in (403, 404)
+    stats_resp = client.get(f"/api/projects/{project_id}/stats", headers=viewer["headers"])
+    assert stats_resp.status_code == 200, stats_resp.text
+    stats = stats_resp.json()
+
+    assert stats["total_tasks"] == 4
+    assert stats["completed_tasks"] == 1
+    assert stats["in_progress_tasks"] == 3
+    assert stats["overdue_tasks"] == 1
+    assert stats["unassigned_tasks"] == 1
+    assert stats["completion_rate"] == 25.0
+
+    # Check by_status
+    status_by_id = {s["list_id"]: s for s in stats["by_status"]}
+    assert status_by_id[todo_list["id"]]["task_count"] == 2
+    assert status_by_id[in_progress_list["id"]]["task_count"] == 1
+    assert status_by_id[done_list["id"]]["task_count"] == 1
+    assert status_by_id[done_list["id"]]["is_done_column"] is True
+
+    # Check overdue_task_items
+    assert len(stats["overdue_task_items"]) == 1
+    assert stats["overdue_task_items"][0]["title"] == "Overdue Task"
+
+    # Check by_member
+    member_by_id = {m["user_id"]: m for m in stats["by_member"]}
+    assert member_by_id[owner["id"]]["total_tasks"] == 2
+    assert member_by_id[owner["id"]]["completed_tasks"] == 1
+    assert member_by_id[owner["id"]]["overdue_tasks"] == 0
+    assert member_by_id[owner["id"]]["completion_rate"] == 50.0
+
+    assert member_by_id[member["id"]]["total_tasks"] == 2
+    assert member_by_id[member["id"]]["completed_tasks"] == 0
+    assert member_by_id[member["id"]]["overdue_tasks"] == 1
+
+    assert member_by_id[viewer["id"]]["total_tasks"] == 0

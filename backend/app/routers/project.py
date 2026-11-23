@@ -25,6 +25,10 @@ from app.schemas.project import (
     ProjectDetailResponse,
     ProjectDashboardSummaryResponse,
     ProjectBoardResponse,
+    ProjectStatusStat,
+    ProjectMemberStat,
+    ProjectOverdueTaskItem,
+    ProjectStatsResponse,
 )
 from app.schemas.list import ListResponse, ListCreate, ListUpdate, ListReorder
 from app.routers.task import _build_task_detail_response
@@ -46,16 +50,29 @@ def _build_project_detail(db: Session, project: Project, user_role: str) -> Proj
         .filter(ListModel.project_id == project.id, ListModel.is_done_column.is_(True))
         .all()
     ]
+    now_utc = utc_now_naive()
     if done_list_ids:
         completed_task_count = active_tasks_query.filter(
             (Task.completed_at.isnot(None)) | (Task.list_id.in_(done_list_ids))
         ).count()
+        overdue_task_count = active_tasks_query.filter(
+            Task.due_date.isnot(None),
+            Task.due_date < now_utc,
+            Task.completed_at.is_(None),
+            ~Task.list_id.in_(done_list_ids),
+        ).count()
     else:
         completed_task_count = active_tasks_query.filter(Task.completed_at.isnot(None)).count()
+        overdue_task_count = active_tasks_query.filter(
+            Task.due_date.isnot(None),
+            Task.due_date < now_utc,
+            Task.completed_at.is_(None),
+        ).count()
     completion_rate = round((completed_task_count / task_count) * 100, 2) if task_count > 0 else 0.0
 
     response.task_count = task_count
     response.completed_task_count = completed_task_count
+    response.overdue_task_count = overdue_task_count
     response.completion_rate = completion_rate
     return response
 
@@ -208,6 +225,150 @@ def get_project_detail(
 ):
     project, member = data
     return _build_project_detail(db, project, member.role)
+
+
+@router.get("/{project_id}/stats", response_model=ProjectStatsResponse)
+def get_project_stats(
+    project_id: int,
+    db: Session = Depends(get_db),
+    data: tuple[Project, ProjectMember] = Depends(get_project_and_membership),
+):
+    """Thống kê chi tiết dự án: số task theo trạng thái (cột), task quá hạn, % hoàn thành và số task theo từng thành viên"""
+    project, _ = data
+    now_utc = utc_now_naive()
+
+    lists = (
+        db.query(ListModel)
+        .filter(ListModel.project_id == project_id)
+        .order_by(ListModel.position.asc(), ListModel.id.asc())
+        .all()
+    )
+    list_map = {lst.id: lst for lst in lists}
+    done_list_ids = {lst.id for lst in lists if lst.is_done_column}
+
+    members = (
+        db.query(ProjectMember)
+        .options(selectinload(ProjectMember.user))
+        .filter(ProjectMember.project_id == project_id)
+        .order_by(ProjectMember.joined_at.asc())
+        .all()
+    )
+
+    tasks = (
+        db.query(Task)
+        .options(selectinload(Task.assignees).selectinload(TaskAssignee.user))
+        .filter(Task.project_id == project_id, Task.is_deleted.is_(False))
+        .all()
+    )
+
+    total_tasks = len(tasks)
+    completed_tasks = 0
+    overdue_tasks = 0
+    unassigned_tasks = 0
+    list_counts = {lst.id: 0 for lst in lists}
+    member_buckets = {
+        m.user_id: {
+            "member": m,
+            "total": 0,
+            "completed": 0,
+            "overdue": 0,
+        }
+        for m in members
+        if m.user is not None
+    }
+    overdue_items: List[ProjectOverdueTaskItem] = []
+
+    for task in tasks:
+        if task.list_id in list_counts:
+            list_counts[task.list_id] += 1
+
+        is_done = task.completed_at is not None or task.list_id in done_list_ids
+        due_naive = as_utc_naive(task.due_date)
+        is_overdue = (not is_done) and due_naive is not None and due_naive < now_utc
+
+        if is_done:
+            completed_tasks += 1
+        if is_overdue:
+            overdue_tasks += 1
+            lst_obj = list_map.get(task.list_id)
+            overdue_items.append(
+                ProjectOverdueTaskItem(
+                    id=task.id,
+                    title=task.title,
+                    list_id=task.list_id,
+                    list_name=lst_obj.name if lst_obj else "—",
+                    priority=task.priority,
+                    due_date=task.due_date,
+                    assignee_names=[
+                        a.user.full_name or a.user.email
+                        for a in (task.assignees or [])
+                        if a.user is not None
+                    ],
+                )
+            )
+
+        assignees = task.assignees or []
+        if not assignees:
+            unassigned_tasks += 1
+        else:
+            for assignee in assignees:
+                bucket = member_buckets.get(assignee.user_id)
+                if bucket is not None:
+                    bucket["total"] += 1
+                    if is_done:
+                        bucket["completed"] += 1
+                    if is_overdue:
+                        bucket["overdue"] += 1
+
+    in_progress_tasks = total_tasks - completed_tasks
+    completion_rate = round((completed_tasks / total_tasks) * 100, 2) if total_tasks > 0 else 0.0
+
+    by_status = [
+        ProjectStatusStat(
+            list_id=lst.id,
+            list_name=lst.name,
+            is_done_column=bool(lst.is_done_column),
+            task_count=list_counts.get(lst.id, 0),
+            percentage=round((list_counts.get(lst.id, 0) / total_tasks) * 100, 1) if total_tasks > 0 else 0.0,
+        )
+        for lst in lists
+    ]
+
+    by_member = []
+    for bucket in member_buckets.values():
+        m = bucket["member"]
+        u = m.user
+        m_total = bucket["total"]
+        m_done = bucket["completed"]
+        by_member.append(
+            ProjectMemberStat(
+                user_id=u.id,
+                full_name=u.full_name,
+                email=u.email,
+                avatar_url=u.avatar_url,
+                role=m.role,
+                total_tasks=m_total,
+                completed_tasks=m_done,
+                in_progress_tasks=m_total - m_done,
+                overdue_tasks=bucket["overdue"],
+                completion_rate=round((m_done / m_total) * 100, 1) if m_total > 0 else 0.0,
+            )
+        )
+    by_member.sort(key=lambda item: (-item.total_tasks, item.full_name.lower()))
+    overdue_items.sort(key=lambda item: item.due_date)
+
+    return ProjectStatsResponse(
+        project_id=project.id,
+        total_tasks=total_tasks,
+        completed_tasks=completed_tasks,
+        in_progress_tasks=in_progress_tasks,
+        overdue_tasks=overdue_tasks,
+        unassigned_tasks=unassigned_tasks,
+        completion_rate=completion_rate,
+        by_status=by_status,
+        by_member=by_member,
+        overdue_task_items=overdue_items[:20],
+    )
 
 
 @router.get("/{project_id}/board", response_model=ProjectBoardResponse)

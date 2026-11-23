@@ -20,7 +20,11 @@ router = APIRouter(prefix="/projects/{project_id}/tasks/{task_id}/attachments", 
 UPLOAD_DIR = settings.UPLOAD_DIR
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+try:
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+except OSError:
+    UPLOAD_DIR = "/tmp/uploads"
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 ALLOWED_MIME_TYPES = {
     "image/jpeg", "image/png", "image/gif", "image/webp",

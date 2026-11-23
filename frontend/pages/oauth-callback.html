@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xác thực Google OAuth2 | Agile Workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body data-root="../">
+  <div id="app">
+    <header id="app-header" class="hdr"></header>
+    <aside id="app-sidebar" class="side"></aside>
+
+    <main class="page-content auth-page" id="main-content">
+      <nav class="crumb" aria-label="Breadcrumb">
+        <a href="../index.html">Không gian làm việc</a>
+        <span>›</span>
+        <span>Xác thực Google</span>
+      </nav>
+
+      <section class="auth-card" style="text-align: center;">
+        <span class="mark auth-mark" style="margin: 0 auto;">A</span>
+        <h1 id="oauth-status-title">Đang hoàn tất đăng nhập Google…</h1>
+        <div id="oauth-spinner" class="oauth-spinner" aria-hidden="true"></div>
+        <p id="oauth-status-message" class="muted">
+          Hệ thống đang thiết lập phiên làm việc bảo mật cho tài khoản của bạn.
+        </p>
+        <div id="oauth-actions" class="dialog-actions" style="justify-content: center;" hidden>
+          <a class="btn btn-primary" href="login.html">← Quay lại trang đăng nhập</a>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/oauth-callback.js"></script>
+</body>
+
+</html>

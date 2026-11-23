@@ -16,6 +16,7 @@ from app.models.project_invitation import ProjectInvitation
 from app.models.list import ListModel
 from app.models.notification import Notification
 from app.models.activity_log import ActivityLog
+from app.core.ws_manager import notify_user_sync
 from app.schemas.project import ProjectCreate
 from app.schemas.project_invitation import InvitationCreate
 
@@ -111,17 +112,16 @@ def transfer_project_ownership(
         target_member.role = "owner"
         project.owner_id = new_owner_id
 
-        db.add(
-            Notification(
-                user_id=new_owner_id,
-                type="member_role_changed",
-                title=f"Bạn đã trở thành Owner của dự án '{project.name}'",
-                message=f"Quyền sở hữu dự án '{project.name}' đã được chuyển cho bạn.",
-                entity_type="project",
-                entity_id=project.id,
-                project_id=project.id,
-            )
+        notif = Notification(
+            user_id=new_owner_id,
+            type="member_role_changed",
+            title=f"Bạn đã trở thành Owner của dự án '{project.name}'",
+            message=f"Quyền sở hữu dự án '{project.name}' đã được chuyển cho bạn.",
+            entity_type="project",
+            entity_id=project.id,
+            project_id=project.id,
         )
+        db.add(notif)
         db.add(
             ActivityLog(
                 project_id=project.id,
@@ -135,6 +135,20 @@ def transfer_project_ownership(
         )
         db.commit()
         db.refresh(target_member)
+        db.refresh(notif)
+        notify_user_sync(
+            new_owner_id,
+            "notification_created",
+            {
+                "id": notif.id,
+                "type": notif.type,
+                "title": notif.title,
+                "message": notif.message,
+                "entity_type": notif.entity_type,
+                "entity_id": notif.entity_id,
+                "project_id": notif.project_id,
+            },
+        )
         return target_member
     except Exception:
         db.rollback()
@@ -243,18 +257,18 @@ def create_project_invitation(
             detail="Đã có lời mời đang chờ phản hồi (pending) cho email này trong dự án",
         )
 
+    notif = None
     if existing_user:
-        db.add(
-            Notification(
-                user_id=existing_user.id,
-                type="invitation_sent",
-                title=f"Lời mời tham gia dự án: {project.name}",
-                message=f"Bạn được mời tham gia dự án '{project.name}' với vai trò '{invitation_in.role}'.",
-                entity_type="invitation",
-                entity_id=invitation.id,
-                project_id=project.id,
-            )
+        notif = Notification(
+            user_id=existing_user.id,
+            type="invitation_sent",
+            title=f"Lời mời tham gia dự án: {project.name}",
+            message=f"Bạn được mời tham gia dự án '{project.name}' với vai trò '{invitation_in.role}'.",
+            entity_type="invitation",
+            entity_id=invitation.id,
+            project_id=project.id,
         )
+        db.add(notif)
 
     db.add(
         ActivityLog(
@@ -269,6 +283,21 @@ def create_project_invitation(
 
     db.commit()
     db.refresh(invitation)
+    if existing_user and notif is not None:
+        db.refresh(notif)
+        notify_user_sync(
+            existing_user.id,
+            "notification_created",
+            {
+                "id": notif.id,
+                "type": notif.type,
+                "title": notif.title,
+                "message": notif.message,
+                "entity_type": notif.entity_type,
+                "entity_id": notif.entity_id,
+                "project_id": notif.project_id,
+            },
+        )
     return invitation, raw_token
 
 

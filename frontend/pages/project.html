@@ -23,25 +23,28 @@
         <span id="project-crumb">Dự án</span>
       </nav>
 
-      <!-- Tiêu đề dự án & tiến độ -->
-      <section class="project-heading" aria-labelledby="project-title">
-        <div>
-          <div class="ph">
-            <span id="project-mark" class="project-mark teal">D</span>
-            <h1 id="project-title">Đang tải dự án…</h1>
-            <span id="project-status" class="chip">Đang tải</span>
+      <!-- Thẻ tiêu đề dự án & tiến độ tổng thể -->
+      <section class="project-header-card" aria-labelledby="project-title">
+        <div class="project-heading">
+          <div>
+            <div class="ph">
+              <span id="project-mark" class="project-mark teal">D</span>
+              <h1 id="project-title">Đang tải dự án…</h1>
+              <span id="project-status" class="chip">Đang tải</span>
+              <span id="project-role-badge" class="role-badge">Member</span>
+            </div>
+            <p id="project-description" class="muted project-description"></p>
+            <div class="project-board-progress">
+              <strong id="project-progress-label" style="color: var(--ink);">0% hoàn thành</strong>
+              <progress id="project-progress" value="0" max="100"></progress>
+              <span id="project-counts"></span>
+            </div>
           </div>
-          <p id="project-description" class="muted project-description"></p>
-          <div class="project-board-progress">
-            <span id="project-progress-label">0% hoàn thành</span>
-            <progress id="project-progress" value="0" max="100"></progress>
-            <span id="project-counts"></span>
-          </div>
-        </div>
 
-        <div class="project-actions">
-          <button id="team-button" class="btn" type="button" hidden>♙ Thành viên</button>
-          <button id="new-task-button" class="btn btn-primary" type="button" hidden>＋ Thêm công việc</button>
+          <div class="project-actions">
+            <button id="team-button" class="btn" type="button" hidden><span data-icon="users"></span><span>Thành viên &amp; Lời mời</span></button>
+            <button id="new-task-button" class="btn btn-primary" type="button" hidden><span data-icon="plus"></span><span>Tạo công việc</span></button>
+          </div>
         </div>
       </section>
 
@@ -49,36 +52,36 @@
         Dự án đã hoàn thành hoặc được lưu trữ — đang ở chế độ chỉ xem.
       </p>
 
-      <!-- Thống kê nhanh trên bảng -->
+      <!-- 4 Chỉ số thống kê nhanh trên bảng -->
       <section id="board-insights" class="board-insights" aria-label="Thống kê dự án" aria-live="polite">
         <article class="board-insight">
-          <span class="insight-icon insight-total">▦</span>
+          <span class="insight-icon insight-total" data-icon="layers"></span>
           <div>
-            <span class="insight-label">Tất cả công việc</span>
+            <span class="insight-label">Tổng công việc</span>
             <strong id="stat-total">—</strong>
           </div>
         </article>
 
         <article class="board-insight">
-          <span class="insight-icon insight-active">◷</span>
+          <span class="insight-icon insight-active" data-icon="clock"></span>
           <div>
-            <span class="insight-label">Đang thực hiện</span>
+            <span class="insight-label">Đang triển khai</span>
             <strong id="stat-active">—</strong>
           </div>
         </article>
 
         <article class="board-insight">
-          <span class="insight-icon insight-done">✓</span>
+          <span class="insight-icon insight-done" data-icon="tasks"></span>
           <div>
-            <span class="insight-label">Hoàn thành</span>
+            <span class="insight-label">Đã hoàn thành</span>
             <strong id="stat-completed">—</strong>
           </div>
         </article>
 
         <article class="board-insight">
-          <span class="insight-icon insight-overdue">!</span>
+          <span class="insight-icon insight-overdue" data-icon="alert"></span>
           <div>
-            <span class="insight-label">Quá hạn</span>
+            <span class="insight-label">Quá hạn chót</span>
             <strong id="stat-overdue">—</strong>
           </div>
         </article>
@@ -86,41 +89,130 @@
 
       <!-- Chuyển chế độ xem -->
       <nav class="tabs" aria-label="Các chế độ xem dự án">
-        <a class="active" href="#board" aria-current="page" data-project-tab="board">▦ Bảng Kanban</a>
-        <a href="#members" data-project-tab="members">Thành viên &amp; Phân quyền</a>
-        <a href="#activity" data-project-tab="activity">Nhật ký hoạt động</a>
+        <a class="active" href="#board" aria-current="page" data-project-tab="board"><span data-icon="columns"></span><span>Bảng Kanban</span></a>
+        <a href="#table" data-project-tab="table"><span data-icon="table"></span><span>Danh sách bảng</span></a>
+        <a href="#stats" data-project-tab="stats"><span data-icon="chart"></span><span>Thống kê</span></a>
+        <a href="#members" data-project-tab="members"><span data-icon="users"></span><span>Thành viên &amp; Phân quyền</span></a>
+        <a href="#activity" data-project-tab="activity"><span data-icon="activity"></span><span>Nhật ký hoạt động</span></a>
       </nav>
 
-      <!-- Thanh công cụ lọc trên bảng -->
+      <!-- Thanh công cụ lọc đa chiều -->
       <div class="board-toolbar">
         <p id="board-summary" class="muted">Đang tải bảng công việc…</p>
         <div class="board-controls">
           <label class="board-search">
-            <span aria-hidden="true">⌕</span>
-            <input id="task-search" type="search" placeholder="Lọc theo tiêu đề…" aria-label="Tìm công việc trong bảng">
+            <span aria-hidden="true" data-icon="search"></span>
+            <input id="task-search" type="search" placeholder="Tìm theo tên hoặc #ID…" aria-label="Tìm công việc trong bảng">
           </label>
+
           <label class="sr-only" for="priority-filter">Lọc theo độ ưu tiên</label>
           <select id="priority-filter" class="filter-select">
-            <option value="">Mọi ưu tiên</option>
+            <option value="">Mọi độ ưu tiên</option>
             <option value="urgent">Khẩn cấp</option>
             <option value="high">Cao</option>
             <option value="medium">Trung bình</option>
             <option value="low">Thấp</option>
           </select>
-          <button id="trash-button" class="filter-btn" type="button" hidden>Thùng rác</button>
-          <button id="retry-board" class="filter-btn" type="button" hidden>Thử lại</button>
+
+          <label class="sr-only" for="assignee-filter">Lọc theo người thực hiện</label>
+          <select id="assignee-filter" class="filter-select">
+            <option value="">Mọi thành viên</option>
+          </select>
+
+          <button id="trash-button" class="filter-btn" type="button" hidden><span data-icon="trash"></span><span>Thùng rác</span></button>
+          <button id="retry-board" class="filter-btn" type="button" hidden><span data-icon="refresh"></span><span>Thử lại</span></button>
         </div>
       </div>
 
-      <!-- Bảng cột Kanban -->
+      <!-- Chế độ 1: Bảng cột Kanban -->
       <section id="board" class="board" aria-label="Bảng công việc" aria-busy="true"></section>
 
-      <!-- Bảng nhật ký hoạt động -->
+      <!-- Chế độ 2: Bảng danh sách công việc (Table View) -->
+      <section id="table-panel" class="content-panel" hidden>
+        <div class="table-wrap" style="margin-top: 0;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Mã</th>
+                <th>Tiêu đề công việc</th>
+                <th>Cột trạng thái</th>
+                <th>Độ ưu tiên</th>
+                <th>Người thực hiện</th>
+                <th>Hạn hoàn thành</th>
+              </tr>
+            </thead>
+            <tbody id="project-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Chế độ 3: Thống kê dự án -->
+      <section id="stats-panel" class="stats-panel" hidden aria-label="Thống kê chi tiết dự án">
+        <div class="stats-grid">
+          <article class="content-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Số công việc theo trạng thái</h2>
+                <p id="stats-completion-summary" class="muted">Đang tải dữ liệu thống kê…</p>
+              </div>
+              <button id="refresh-stats-btn" class="btn btn-small" type="button"><span data-icon="refresh"></span><span>Làm mới</span></button>
+            </div>
+            <div id="stats-by-status" class="health-bars">
+              <p class="muted">Đang tải…</p>
+            </div>
+          </article>
+
+          <article class="content-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Công việc quá hạn</h2>
+                <p id="stats-overdue-summary" class="muted">Các công việc chưa hoàn thành đã vượt hạn chót.</p>
+              </div>
+              <span id="stats-overdue-badge" class="role-badge">0 quá hạn</span>
+            </div>
+            <div id="stats-overdue-list" class="stats-overdue-list">
+              <p class="muted">Đang tải…</p>
+            </div>
+          </article>
+        </div>
+
+        <article class="content-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Số công việc theo từng thành viên</h2>
+              <p id="stats-member-summary" class="muted">Phân bổ khối lượng và tiến độ hoàn thành theo từng thành viên trong dự án.</p>
+            </div>
+            <span id="stats-unassigned-badge" class="role-badge" hidden>0 chưa giao</span>
+          </div>
+          <div class="table-wrap" style="margin-top: 0;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Thành viên</th>
+                  <th>Vai trò</th>
+                  <th>Tổng được giao</th>
+                  <th>Đang làm</th>
+                  <th>Hoàn thành</th>
+                  <th>Quá hạn</th>
+                  <th>Tiến độ</th>
+                </tr>
+              </thead>
+              <tbody id="stats-by-member-body">
+                <tr>
+                  <td colspan="7" class="muted">Đang tải thống kê thành viên…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <!-- Chế độ 4: Bảng nhật ký hoạt động -->
       <section id="activity-panel" class="content-panel activity-panel" hidden>
         <div class="panel-heading">
           <div>
             <h2>Nhật ký hoạt động dự án</h2>
-            <p class="muted">Lịch sử cập nhật, di chuyển thẻ và trao đổi của các thành viên.</p>
+            <p class="muted">Lịch sử cập nhật, di chuyển thẻ và trao đổi của các thành viên theo thời gian thực.</p>
           </div>
         </div>
         <div id="activity-list"></div>
@@ -128,13 +220,13 @@
 
       <!-- Hộp thoại Chi tiết / Tạo công việc -->
       <dialog id="task-dialog" class="app-dialog task-dialog">
-        <form id="task-form" class="dialog-form">
+        <form id="task-form" class="dialog-form" novalidate>
           <div class="dialog-heading">
             <div>
               <p id="task-dialog-context" class="eyebrow">CÔNG VIỆC</p>
               <h2 id="task-dialog-title">Tạo công việc</h2>
             </div>
-            <button class="icon-btn" type="button" data-close-task aria-label="Đóng">×</button>
+            <button class="icon-btn" type="button" data-close-task aria-label="Đóng" data-icon="close"></button>
           </div>
 
           <div class="task-editor-grid">
@@ -142,22 +234,22 @@
               <label for="task-title">Tiêu đề công việc *</label>
               <input id="task-title" name="title" maxlength="255" placeholder="Nhập tiêu đề ngắn gọn, rõ ràng…" required>
 
-              <label for="task-description">Mô tả chi tiết</label>
-              <textarea id="task-description" name="description" rows="4" placeholder="Thêm ghi chú, yêu cầu kỹ thuật hoặc tiêu chí nghiệm thu…"></textarea>
+              <label for="task-description">Mô tả &amp; Tiêu chí nghiệm thu</label>
+              <textarea id="task-description" name="description" rows="4" placeholder="Thêm ghi chú kỹ thuật, tài liệu tham khảo hoặc tiêu chí hoàn thành…"></textarea>
 
-              <label for="task-list">Cột trạng thái</label>
+              <label for="task-list">Cột trạng thái Kanban</label>
               <select id="task-list" name="list_id"></select>
 
               <!-- Checklist -->
               <section id="checklist-panel" class="task-subpanel" hidden>
                 <div class="subpanel-heading">
                   <h3>Danh sách kiểm tra (Checklist)</h3>
-                  <span id="checklist-progress" class="muted"></span>
+                  <span id="checklist-progress" class="role-badge"></span>
                 </div>
                 <div id="checklist-items"></div>
                 <div id="checklist-form" class="inline-form">
-                  <input name="content" maxlength="500" placeholder="Thêm mục công việc nhỏ…">
-                  <button class="btn btn-small" type="button">Thêm</button>
+                  <input name="content" maxlength="500" placeholder="Thêm đầu việc con cần kiểm tra…">
+                  <button class="btn btn-small" type="button">＋ Thêm mục</button>
                 </div>
               </section>
 
@@ -189,26 +281,26 @@
 
             <!-- Cột thuộc tính bên phải -->
             <aside class="task-editor-side">
-              <label for="task-priority">Độ ưu tiên</label>
+              <label for="task-priority">Mức độ ưu tiên</label>
               <select id="task-priority" name="priority">
-                <option value="low">Thấp</option>
-                <option value="medium">Trung bình</option>
-                <option value="high">Cao</option>
-                <option value="urgent">Khẩn cấp</option>
+                <option value="low">Thấp (Low)</option>
+                <option value="medium">Trung bình (Medium)</option>
+                <option value="high">Cao (High)</option>
+                <option value="urgent">Khẩn cấp (Urgent)</option>
               </select>
 
-              <label for="task-start-date">Ngày bắt đầu</label>
+              <label for="task-start-date">Thời gian bắt đầu</label>
               <input id="task-start-date" name="start_date" type="datetime-local">
 
-              <label for="task-due-date">Hạn hoàn thành</label>
+              <label for="task-due-date">Hạn chót hoàn thành</label>
               <input id="task-due-date" name="due_date" type="datetime-local">
 
-              <label for="task-assignees">Người thực hiện</label>
+              <label for="task-assignees">Người thực hiện (Giữ Ctrl để chọn nhiều)</label>
               <select id="task-assignees" name="assignee_ids" multiple size="4"></select>
 
               <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;margin-bottom:5px;">
                 <label for="task-labels" style="margin:0;">Nhãn phân loại</label>
-                <button id="create-label-btn" class="btn btn-small" type="button" hidden>＋ Nhãn</button>
+                <button id="create-label-btn" class="btn btn-small" type="button" hidden>＋ Tạo nhãn</button>
               </div>
               <select id="task-labels" name="label_ids" multiple size="3"></select>
 
@@ -218,7 +310,7 @@
           </div>
 
           <div class="dialog-actions">
-            <button id="task-delete" class="btn btn-danger" type="button" hidden>Xoá công việc</button>
+            <button id="task-delete" class="btn btn-danger" type="button" hidden>Xoá vào thùng rác</button>
             <span class="grow"></span>
             <button class="btn" type="button" data-close-task>Huỷ</button>
             <button id="task-submit" class="btn btn-primary" type="submit">Tạo công việc</button>
@@ -232,16 +324,16 @@
           <div class="dialog-heading">
             <div>
               <p class="eyebrow">QUẢN LÝ ĐỘI NHÓM</p>
-              <h2>Thành viên &amp; Lời mời tham gia</h2>
+              <h2>Thành viên &amp; Phân quyền dự án</h2>
             </div>
-            <button class="icon-btn" type="button" data-close-team aria-label="Đóng">×</button>
+            <button class="icon-btn" type="button" data-close-team aria-label="Đóng" data-icon="close"></button>
           </div>
 
-          <form id="invite-form" class="invite-form">
-            <label for="invite-email">Email người nhận</label>
-            <input id="invite-email" name="invitee_email" type="email" placeholder="thanhvien@congty.vn" required>
+          <form id="invite-form" class="invite-form" novalidate>
+            <label for="invite-email">Email người nhận lời mời</label>
+            <input id="invite-email" name="invitee_email" type="email" placeholder="thanhvien@taskflow.vn" required>
 
-            <label for="invite-role">Vai trò dự án</label>
+            <label for="invite-role">Vai trò trong dự án</label>
             <select id="invite-role" name="role">
               <option value="member">Thành viên (Member)</option>
               <option value="viewer">Người xem (Viewer)</option>
@@ -254,14 +346,23 @@
           <div id="invite-result" class="invite-result" hidden></div>
 
           <section class="team-section">
-            <h3>Danh sách thành viên hiện tại</h3>
+            <h3>Danh sách thành viên dự án</h3>
             <div id="project-members"></div>
           </section>
 
-          <section class="team-section">
+          <section id="project-invitations-section" class="team-section">
             <h3>Lời mời đang chờ xác nhận</h3>
             <div id="project-invitations"></div>
           </section>
+
+          <div class="dialog-actions" style="margin-top: 16px;">
+            <button id="leave-project-button" class="btn btn-danger" type="button" hidden>Rời dự án</button>
+            <p id="leave-owner-hint" class="muted" style="margin:0;font-size:12.5px;" hidden>
+              Bạn đang là Owner. Hãy chuyển quyền Owner cho thành viên khác trước khi rời dự án.
+            </p>
+            <span class="grow"></span>
+            <button class="btn" type="button" data-close-team>Đóng</button>
+          </div>
         </div>
       </dialog>
 
@@ -271,9 +372,9 @@
           <div class="dialog-heading">
             <div>
               <p class="eyebrow">KHÔI PHỤC DỮ LIỆU</p>
-              <h2>Thùng rác công việc</h2>
+              <h2>Thùng rác công việc đã xoá</h2>
             </div>
-            <button class="icon-btn" type="button" data-close-trash aria-label="Đóng">×</button>
+            <button class="icon-btn" type="button" data-close-trash aria-label="Đóng" data-icon="close"></button>
           </div>
           <div id="deleted-tasks"></div>
         </div>

@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#2563eb"/>
-  <text x="16" y="21" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">KS</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="8" fill="#18181B"/>
+  <rect x="0.75" y="0.75" width="30.5" height="30.5" rx="7.25" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="1.5"/>
+  <path d="M9 21.5L16 9.5L23 21.5" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M12.2 17.5H19.8" stroke="#818CF8" stroke-width="2.2" stroke-linecap="round"/>
 </svg>
