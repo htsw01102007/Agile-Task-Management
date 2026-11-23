@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="icon" href="../assets/images/logo.svg">
-  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/style.css?v=20261123">
 </head>
 
 <body data-root="../">
@@ -91,8 +91,9 @@
       <nav class="tabs" aria-label="Các chế độ xem dự án">
         <a class="active" href="#board" aria-current="page" data-project-tab="board"><span data-icon="columns"></span><span>Bảng Kanban</span></a>
         <a href="#table" data-project-tab="table"><span data-icon="table"></span><span>Danh sách bảng</span></a>
+        <a href="#stats" data-project-tab="stats"><span data-icon="activity"></span><span>Thống kê công việc</span></a>
         <a href="#members" data-project-tab="members"><span data-icon="users"></span><span>Thành viên &amp; Phân quyền</span></a>
-        <a href="#activity" data-project-tab="activity"><span data-icon="activity"></span><span>Nhật ký hoạt động</span></a>
+        <a href="#activity" data-project-tab="activity"><span data-icon="clock"></span><span>Nhật ký hoạt động</span></a>
       </nav>
 
       <!-- Thanh công cụ lọc đa chiều -->
@@ -145,7 +146,59 @@
         </div>
       </section>
 
-      <!-- Chế độ 3: Bảng nhật ký hoạt động -->
+      <!-- Chế độ 3: Thống kê công việc theo dự án & từng thành viên -->
+      <section id="stats-panel" class="content-panel stats-panel" hidden>
+        <div class="panel-heading">
+          <div>
+            <h2>Thống kê &amp; Phân bổ công việc dự án</h2>
+            <p class="muted">Tỷ lệ hoàn thành toàn dự án và khối lượng, hiệu suất công việc của từng thành viên.</p>
+          </div>
+        </div>
+
+        <div class="project-stats-overview">
+          <div class="health-bars">
+            <div class="health-row">
+              <div class="health-row-top">
+                <span>Hoàn thành</span>
+                <span id="proj-stat-done-label">0/0 việc (0%)</span>
+              </div>
+              <div class="health-track">
+                <div id="proj-stat-done-bar" class="health-fill" style="width: 0%; background: var(--ok);"></div>
+              </div>
+            </div>
+
+            <div class="health-row">
+              <div class="health-row-top">
+                <span>Đang triển khai</span>
+                <span id="proj-stat-active-label">0 việc (0%)</span>
+              </div>
+              <div class="health-track">
+                <div id="proj-stat-active-bar" class="health-fill" style="width: 0%; background: var(--accent);"></div>
+              </div>
+            </div>
+
+            <div class="health-row">
+              <div class="health-row-top">
+                <span>Quá hạn cần xử lý</span>
+                <span id="proj-stat-overdue-label">0 việc</span>
+              </div>
+              <div class="health-track">
+                <div id="proj-stat-overdue-bar" class="health-fill" style="width: 0%; background: var(--err);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="member-stats-section">
+          <div class="subpanel-heading" style="margin-bottom: 14px;">
+            <h3>Tỷ lệ công việc theo từng thành viên</h3>
+            <span id="member-stats-summary" class="muted"></span>
+          </div>
+          <div id="member-stats-list" class="member-stats-grid"></div>
+        </div>
+      </section>
+
+      <!-- Chế độ 4: Bảng nhật ký hoạt động -->
       <section id="activity-panel" class="content-panel activity-panel" hidden>
         <div class="panel-heading">
           <div>
@@ -314,11 +367,11 @@
   <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
-  <script src="../js/config.js"></script>
-  <script src="../js/api.js"></script>
-  <script src="../js/utils.js"></script>
-  <script src="../js/layout.js"></script>
-  <script src="../js/pages/project.js"></script>
+  <script src="../js/config.js?v=20261123"></script>
+  <script src="../js/api.js?v=20261123"></script>
+  <script src="../js/utils.js?v=20261123"></script>
+  <script src="../js/layout.js?v=20261123"></script>
+  <script src="../js/pages/project.js?v=20261123"></script>
 </body>
 
 </html>

@@ -3792,3 +3792,78 @@ svg.icon {
   font-weight: 600;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+/* ── Tab Thống kê công việc & Tỷ lệ theo từng thành viên ── */
+.project-stats-overview {
+  padding: 18px 20px;
+  margin-bottom: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-subtle);
+}
+
+.member-stats-section {
+  margin-top: 8px;
+}
+
+.member-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.member-stat-card {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.member-stat-card:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.member-stat-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.member-stat-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.member-stat-user strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.member-stat-user small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.member-stat-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.member-health-bars {
+  gap: 11px;
+}

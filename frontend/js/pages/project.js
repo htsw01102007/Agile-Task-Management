@@ -40,7 +40,9 @@ function priorityText(priority) {
 }
 
 function isTaskDone(task) {
-  return Boolean(task.completed_at) || boardData.lists.some((list) => list.id === task.list_id && list.is_done_column);
+  const list = boardData?.lists?.find((item) => item.id === task.list_id);
+  if (list) return Boolean(list.is_done_column);
+  return Boolean(task.completed_at);
 }
 
 function formatDueDate(value, completed) {
@@ -218,10 +220,187 @@ function renderBoard() {
   });
 
   renderTableView(visibleTasks);
+  renderStatsView();
 
   const completedCount = boardData.tasks.filter(isTaskDone).length;
   summaryElement.textContent = `${boardData.lists.length} cột · Hiển thị ${visibleTasks.length}/${boardData.tasks.length} công việc · Tiến độ ${boardData.tasks.length ? Math.round(completedCount / boardData.tasks.length * 100) : 0}%`;
   renderInsights();
+}
+
+function renderStatsView() {
+  if (!boardData) return;
+  const statsPanel = document.getElementById("stats-panel");
+  if (!statsPanel) return;
+
+  const allTasks = boardData.tasks || [];
+  const totalTasks = allTasks.length;
+  const now = Date.now();
+  const completedTasks = allTasks.filter(isTaskDone).length;
+  const activeTasks = Math.max(0, totalTasks - completedTasks);
+  const overdueTasks = allTasks.filter((t) => !isTaskDone(t) && t.due_date && new Date(t.due_date).getTime() < now).length;
+
+  const donePct = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const activePct = totalTasks ? Math.round((activeTasks / totalTasks) * 100) : 0;
+  const overduePct = totalTasks ? Math.min(100, Math.round((overdueTasks / totalTasks) * 100)) : 0;
+
+  const doneLabel = document.getElementById("proj-stat-done-label");
+  const activeLabel = document.getElementById("proj-stat-active-label");
+  const overdueLabel = document.getElementById("proj-stat-overdue-label");
+  if (doneLabel) doneLabel.textContent = `${completedTasks}/${totalTasks} việc (${donePct}%)`;
+  if (activeLabel) activeLabel.textContent = `${activeTasks} việc (${activePct}%)`;
+  if (overdueLabel) overdueLabel.textContent = `${overdueTasks} việc`;
+
+  const doneBar = document.getElementById("proj-stat-done-bar");
+  const activeBar = document.getElementById("proj-stat-active-bar");
+  const overdueBar = document.getElementById("proj-stat-overdue-bar");
+  if (doneBar) doneBar.style.width = `${donePct}%`;
+  if (activeBar) activeBar.style.width = `${activePct}%`;
+  if (overdueBar) overdueBar.style.width = `${overduePct}%`;
+
+  // Xây dựng danh sách thành viên kết hợp từ members API và assignees trong tasks
+  const memberMap = new Map();
+  (members || []).forEach((m) => {
+    const u = m.user || {};
+    memberMap.set(m.user_id, {
+      user_id: m.user_id,
+      full_name: u.full_name || u.email || `Thành viên #${m.user_id}`,
+      email: u.email || "",
+      avatar_url: u.avatar_url || null,
+      role: m.role || "member",
+      tasks: [],
+    });
+  });
+
+  const unassignedTasks = [];
+  allTasks.forEach((task) => {
+    const assignees = task.assignees || [];
+    if (!assignees.length) {
+      unassignedTasks.push(task);
+      return;
+    }
+    assignees.forEach((a) => {
+      if (!memberMap.has(a.user_id)) {
+        memberMap.set(a.user_id, {
+          user_id: a.user_id,
+          full_name: a.user_full_name || a.user_email || `Thành viên #${a.user_id}`,
+          email: a.user_email || "",
+          avatar_url: a.user_avatar_url || null,
+          role: "member",
+          tasks: [],
+        });
+      }
+      memberMap.get(a.user_id).tasks.push(task);
+    });
+  });
+
+  const summarySpan = document.getElementById("member-stats-summary");
+  if (summarySpan) {
+    summarySpan.textContent = `${memberMap.size} thành viên · Tổng ${totalTasks} công việc trong dự án`;
+  }
+
+  const container = document.getElementById("member-stats-list");
+  if (!container) return;
+
+  const memberList = [...memberMap.values()].sort((a, b) => b.tasks.length - a.tasks.length);
+  if (unassignedTasks.length > 0) {
+    memberList.push({
+      user_id: "unassigned",
+      full_name: "Chưa giao cho thành viên",
+      email: "Các công việc chưa chỉ định người thực hiện",
+      avatar_url: null,
+      role: "unassigned",
+      tasks: unassignedTasks,
+    });
+  }
+
+  if (!memberList.length) {
+    container.innerHTML = '<p class="empty-state">Chưa có dữ liệu thành viên trong dự án.</p>';
+    return;
+  }
+
+  const roleLabels = {
+    owner: "Owner",
+    manager: "Manager",
+    member: "Member",
+    viewer: "Viewer",
+    unassigned: "Chưa phân công",
+  };
+
+  container.innerHTML = memberList.map((m) => {
+    const mTotal = m.tasks.length;
+    const mDone = m.tasks.filter(isTaskDone).length;
+    const mActive = Math.max(0, mTotal - mDone);
+    const mOverdue = m.tasks.filter((t) => !isTaskDone(t) && t.due_date && new Date(t.due_date).getTime() < now).length;
+
+    // Tỷ lệ khối lượng công việc của thành viên so với tổng công việc toàn dự án
+    const sharePct = totalTasks ? Math.round((mTotal / totalTasks) * 100) : 0;
+    // Tỷ lệ hoàn thành trên số việc thành viên được giao
+    const memberDonePct = mTotal ? Math.round((mDone / mTotal) * 100) : 0;
+    const memberActivePct = mTotal ? Math.round((mActive / mTotal) * 100) : 0;
+    const memberOverduePct = mTotal ? Math.min(100, Math.round((mOverdue / mTotal) * 100)) : 0;
+
+    const avatarHtml = m.avatar_url
+      ? `<img class="avatar avatar-small" src="${escapeHtml(m.avatar_url)}" alt="${escapeHtml(m.full_name)}">`
+      : `<span class="avatar avatar-small">${escapeHtml(m.user_id === "unassigned" ? "?" : initials(m.full_name))}</span>`;
+
+    return `<article class="member-stat-card">
+      <div class="member-stat-header">
+        <div class="member-stat-user">
+          ${avatarHtml}
+          <div>
+            <strong>${escapeHtml(m.full_name)}</strong>
+            ${m.email ? `<small>${escapeHtml(m.email)}</small>` : ""}
+          </div>
+        </div>
+        <div class="member-stat-badges">
+          <span class="role-badge">${escapeHtml(roleLabels[m.role] || m.role)}</span>
+          <span class="stat-pill"><strong>${sharePct}%</strong>&nbsp;khối lượng dự án (${mTotal}/${totalTasks} việc)</span>
+        </div>
+      </div>
+
+      <div class="health-bars member-health-bars">
+        <div class="health-row">
+          <div class="health-row-top">
+            <span>Tỷ lệ đảm nhận trong dự án</span>
+            <span>${mTotal}/${totalTasks} việc (${sharePct}%)</span>
+          </div>
+          <div class="health-track">
+            <div class="health-fill" style="width: ${sharePct}%; background: #8b5cf6;"></div>
+          </div>
+        </div>
+
+        <div class="health-row">
+          <div class="health-row-top">
+            <span>Hoàn thành</span>
+            <span>${mDone}/${mTotal} việc (${memberDonePct}%)</span>
+          </div>
+          <div class="health-track">
+            <div class="health-fill" style="width: ${memberDonePct}%; background: var(--ok);"></div>
+          </div>
+        </div>
+
+        <div class="health-row">
+          <div class="health-row-top">
+            <span>Đang triển khai</span>
+            <span>${mActive} việc (${memberActivePct}%)</span>
+          </div>
+          <div class="health-track">
+            <div class="health-fill" style="width: ${memberActivePct}%; background: var(--accent);"></div>
+          </div>
+        </div>
+
+        <div class="health-row">
+          <div class="health-row-top">
+            <span>Quá hạn cần xử lý</span>
+            <span>${mOverdue} việc</span>
+          </div>
+          <div class="health-track">
+            <div class="health-fill" style="width: ${memberOverduePct}%; background: var(--err);"></div>
+          </div>
+        </div>
+      </div>
+    </article>`;
+  }).join("");
 }
 
 function renderProject() {
@@ -268,18 +447,22 @@ async function loadBoard({ showSkeleton = false } = {}) {
   }
   try {
     const id = await resolveProjectId();
-    const [project, board, user] = await Promise.all([
+    const [project, board, user, memberList] = await Promise.all([
       api.get(`/projects/${id}`),
       api.get(`/projects/${id}/board`),
       currentUser ? Promise.resolve(currentUser) : api.get("/auth/me"),
+      api.get(`/projects/${id}/members`).catch(() => members),
     ]);
     projectData = project;
     boardData = board;
     currentUser = user;
+    if (Array.isArray(memberList)) members = memberList;
     renderProject();
     renderBoard();
+    connectProjectWebSocket(id);
     if (window.location.hash === "#activity") setProjectTab("activity");
     else if (window.location.hash === "#table") setProjectTab("table");
+    else if (window.location.hash === "#stats") setProjectTab("stats");
     boardElement.setAttribute("aria-busy", "false");
     const taskId = Number(new URLSearchParams(window.location.search).get("task"));
     if (Number.isSafeInteger(taskId) && taskId > 0 && !taskDialog.open) await openTask(taskId, false);
@@ -878,12 +1061,15 @@ document.getElementById("project-invitations").addEventListener("click", async (
 function setProjectTab(tab) {
   activeTab = tab;
   const isActivity = tab === "activity";
+  const isStats = tab === "stats";
   const isTable = tab === "table";
   const isBoard = tab === "board";
 
-  document.querySelector(".board-toolbar").hidden = isActivity;
+  document.querySelector(".board-toolbar").hidden = isActivity || isStats;
   boardElement.hidden = !isBoard;
   if (tablePanel) tablePanel.hidden = !isTable;
+  const statsPanel = document.getElementById("stats-panel");
+  if (statsPanel) statsPanel.hidden = !isStats;
   document.getElementById("activity-panel").hidden = !isActivity;
 
   document.querySelectorAll("[data-project-tab]").forEach((link) => {
@@ -893,6 +1079,7 @@ function setProjectTab(tab) {
     else link.removeAttribute("aria-current");
   });
   if (isActivity) loadActivity();
+  if (isStats) renderStatsView();
 }
 
 async function loadActivity() {
@@ -948,7 +1135,9 @@ async function handleListAction(action, listId) {
       await api.put(`/projects/${projectId}/lists/${listId}`, { name });
       showToast(`Đã đổi tên cột thành "${name}"`);
     } else if (action === "done") {
-      await api.put(`/projects/${projectId}/lists/${listId}`, { is_done_column: !list.is_done_column });
+      const nextDone = !list.is_done_column;
+      await api.put(`/projects/${projectId}/lists/${listId}`, { is_done_column: nextDone });
+      showToast(nextDone ? `Đã đặt "${list.name}" làm cột Hoàn thành` : `Đã bỏ đánh dấu cột Hoàn thành cho "${list.name}"`);
     } else if (action === "delete") {
       const otherLists = boardData.lists.filter((item) => item.id !== listId);
       if (!otherLists.length) return showToast("Dự án phải còn ít nhất một danh sách", "error");
@@ -1103,6 +1292,8 @@ boardElement.addEventListener("drop", async (event) => {
         Object.assign(task, updated);
         renderInsights();
         renderTableView(getFilteredTasks());
+        renderStatsView();
+        broadcastLocalBoardEvent("task_moved", updated);
       }
     } catch (error) {
       // Hoàn tác nếu lỗi mạng hoặc phân quyền
@@ -1154,7 +1345,163 @@ document.querySelector(".header-search input")?.addEventListener("input", (event
   renderBoard();
 });
 
+let projectSocket = null;
+let projectSocketId = null;
+let projectPingTimer = null;
+let projectReconnectTimer = null;
+let silentSyncTimer = null;
+const boardBroadcastChannel = typeof BroadcastChannel !== "undefined"
+  ? new BroadcastChannel("agile-project-board-sync")
+  : null;
+
+function broadcastLocalBoardEvent(event, data) {
+  if (!boardBroadcastChannel || !projectId) return;
+  try {
+    boardBroadcastChannel.postMessage({ projectId, event, data });
+  } catch {}
+}
+
+if (boardBroadcastChannel) {
+  boardBroadcastChannel.addEventListener("message", (msg) => {
+    const payload = msg.data;
+    if (!payload || Number(payload.projectId) !== Number(projectId)) return;
+    handleProjectRealtimeMessage({ event: payload.event, data: payload.data });
+  });
+}
+
+async function syncBoardSilently() {
+  if (!projectId || draggedTask || draggedListId) return;
+  try {
+    const board = await api.get(`/projects/${projectId}/board`);
+    if (draggedTask || draggedListId) return;
+    boardData = board;
+    renderBoard();
+  } catch {}
+}
+
+function scheduleSilentBoardSync(delayMs = 180) {
+  clearTimeout(silentSyncTimer);
+  silentSyncTimer = setTimeout(syncBoardSilently, delayMs);
+}
+
+function handleProjectRealtimeMessage(payload) {
+  if (!payload || !boardData) return;
+  const { event, data } = payload;
+
+  if ((event === "task_moved" || event === "task_updated" || event === "task_created") && data && data.id) {
+    if (!draggedTask) {
+      const idx = boardData.tasks.findIndex((t) => t.id === data.id);
+      if (idx >= 0) {
+        const oldListId = boardData.tasks[idx].list_id;
+        Object.assign(boardData.tasks[idx], data);
+        // Sắp xếp lại vị trí các thẻ cùng cột để phản ánh vị trí mới ngay lập tức
+        const siblings = boardData.tasks
+          .filter((t) => t.list_id === data.list_id && t.id !== data.id)
+          .sort((a, b) => a.position - b.position || a.id - b.id);
+        const targetPos = Math.max(0, Math.min(Number(data.position) || 0, siblings.length));
+        siblings.splice(targetPos, 0, boardData.tasks[idx]);
+        siblings.forEach((t, i) => { t.position = i; });
+        if (oldListId !== data.list_id) {
+          boardData.tasks
+            .filter((t) => t.list_id === oldListId)
+            .sort((a, b) => a.position - b.position || a.id - b.id)
+            .forEach((t, i) => { t.position = i; });
+        }
+      } else {
+        boardData.tasks.push(data);
+      }
+      renderBoard();
+    }
+    scheduleSilentBoardSync(220);
+    return;
+  }
+
+  if (event === "task_deleted" && data && data.task_id) {
+    boardData.tasks = boardData.tasks.filter((t) => t.id !== Number(data.task_id));
+    renderBoard();
+    scheduleSilentBoardSync(200);
+    return;
+  }
+
+  if (
+    event === "task_restored"
+    || event === "task_reordered"
+    || event === "list_created"
+    || event === "list_updated"
+    || event === "list_deleted"
+    || event === "list_reordered"
+  ) {
+    scheduleSilentBoardSync(80);
+    return;
+  }
+
+  if (
+    (event === "comment_added" || event === "comment_updated" || event === "comment_deleted" || event === "checklist_updated")
+    && taskDialog.open
+    && currentTask
+    && Number(data?.task_id) === Number(currentTask.id)
+  ) {
+    loadTaskExtras(currentTask.id);
+  }
+}
+
+function connectProjectWebSocket(targetProjectId) {
+  const token = localStorage.getItem("access_token") || localStorage.getItem("token");
+  if (!token || !targetProjectId) return;
+  if (
+    projectSocket
+    && projectSocketId === targetProjectId
+    && (projectSocket.readyState === WebSocket.OPEN || projectSocket.readyState === WebSocket.CONNECTING)
+  ) {
+    return;
+  }
+
+  if (projectSocket) {
+    try { projectSocket.close(); } catch {}
+    projectSocket = null;
+  }
+
+  projectSocketId = targetProjectId;
+  const wsBase = CONFIG.API_BASE_URL.replace(/^http/i, "ws");
+  const wsUrl = `${wsBase}/ws/projects/${targetProjectId}?token=${encodeURIComponent(token)}`;
+
+  try {
+    projectSocket = new WebSocket(wsUrl);
+  } catch {
+    return;
+  }
+
+  projectSocket.addEventListener("open", () => {
+    clearInterval(projectPingTimer);
+    projectPingTimer = setInterval(() => {
+      if (projectSocket && projectSocket.readyState === WebSocket.OPEN) {
+        projectSocket.send("ping");
+      }
+    }, 20000);
+  });
+
+  projectSocket.addEventListener("message", (event) => {
+    try {
+      const payload = JSON.parse(event.data);
+      handleProjectRealtimeMessage(payload);
+    } catch {}
+  });
+
+  projectSocket.addEventListener("close", (event) => {
+    clearInterval(projectPingTimer);
+    projectSocket = null;
+    const stillLoggedIn = Boolean(localStorage.getItem("access_token") || localStorage.getItem("token"));
+    if (stillLoggedIn && event.code !== 1008 && projectId === targetProjectId) {
+      clearTimeout(projectReconnectTimer);
+      projectReconnectTimer = setTimeout(() => connectProjectWebSocket(targetProjectId), 3000);
+    }
+  });
+}
+
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && projectId && !taskDialog.open) loadBoard();
+  if (!document.hidden && projectId && !taskDialog.open) {
+    loadBoard();
+    connectProjectWebSocket(projectId);
+  }
 });
 loadBoard();
