@@ -134,7 +134,13 @@ async def google_login(request: Request, frontend_url: str | None = None):
             url=f"{frontend_base}/pages/login.html?error={quote_plus(error_msg)}"
         )
 
-    redirect_uri = settings.GOOGLE_REDIRECT_URI
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip()
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "http").split(",")[0].strip()
+    if host and not host.startswith(("127.0.0.1", "localhost")):
+        redirect_uri = f"{proto}://{host}/api/auth/google/callback"
+    else:
+        redirect_uri = settings.GOOGLE_REDIRECT_URI
+
     return await oauth.google.authorize_redirect(
         request,
         redirect_uri,

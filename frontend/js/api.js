@@ -57,7 +57,11 @@ http.interceptors.response.use(
     if (error.response?.status === 401 && request && !request._retry && !isAuthRequest && refreshToken) {
       request._retry = true;
       try {
-        const response = await axios.post(`${CONFIG.API_BASE_URL}/auth/refresh`, { refresh_token: refreshToken });
+        const response = await axios.post(
+          `${CONFIG.API_BASE_URL}/auth/refresh`,
+          { refresh_token: refreshToken },
+          { headers: { "ngrok-skip-browser-warning": "true" } },
+        );
         localStorage.setItem("access_token", response.data.access_token);
         localStorage.setItem("refresh_token", response.data.refresh_token);
         request.headers.Authorization = `Bearer ${response.data.access_token}`;
