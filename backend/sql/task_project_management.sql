@@ -253,10 +253,6 @@ CREATE TABLE password_reset_tokens (
     INDEX idx_prt_user (user_id)
 ) ENGINE=InnoDB;
 
-ALTER TABLE tasks
-  ADD COLUMN is_deleted TINYINT(1) NOT NULL DEFAULT 0,
-  ADD COLUMN deleted_at DATETIME NULL;
-
 INSERT INTO users (id, email, username, password_hash, full_name, avatar_url, system_role, is_active, last_login_at, created_at) VALUES
 (1, 'admin@taskflow.vn',   'admin',     '$2b$12$o3mDxKlt8BBdedgZYRkwWuTyRSimL8FFwdrMubxELuvSSSFDgsKx.', 'Quản Trị Hệ Thống', NULL, 'admin', TRUE,  '2026-11-04 07:45:00', '2026-08-20 09:00:00'),
 (2, 'minh.tran@taskflow.vn', 'minhtran', '$2b$12$o3mDxKlt8BBdedgZYRkwWuTyRSimL8FFwdrMubxELuvSSSFDgsKx.', 'Trần Quang Minh',    'https://i.pravatar.cc/150?img=11', 'user', TRUE,  '2026-11-04 08:10:00', '2026-08-25 10:00:00'),
