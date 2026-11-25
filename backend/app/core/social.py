@@ -1,7 +1,7 @@
-"""OAuth 2.0 / OpenID Connect cho Google và Facebook.
+"""OAuth 2.0 / OpenID Connect cho Google.
 
 Backend đổi authorization code lấy token, rồi kiểm tra chữ ký id_token
-bằng khóa công khai của nhà cung cấp. Client secret không rời khỏi server.
+bằng khóa công khai của Google. Client secret không rời khỏi server.
 """
 import json
 from dataclasses import dataclass
@@ -16,7 +16,6 @@ from app.core.config import settings
 
 _TIMEOUT_SECONDS = 10
 _google_jwks: PyJWKClient | None = None
-_facebook_jwks: PyJWKClient | None = None
 
 
 class OAuthFlowError(Exception):
@@ -84,16 +83,6 @@ def _google_jwks_client() -> PyJWKClient:
     return _google_jwks
 
 
-def _facebook_jwks_client() -> PyJWKClient:
-    global _facebook_jwks
-    if _facebook_jwks is None:
-        _facebook_jwks = PyJWKClient(
-            "https://www.facebook.com/.well-known/oauth/openid/jwks/",
-            timeout=_TIMEOUT_SECONDS,
-        )
-    return _facebook_jwks
-
-
 def _profile_from_google(payload: dict) -> SocialProfile:
     subject = str(payload.get("sub") or "")
     email = payload.get("email")
@@ -101,28 +90,10 @@ def _profile_from_google(payload: dict) -> SocialProfile:
         raise OAuthFlowError(401, "Google không trả về mã người dùng")
     name = payload.get("name") or (str(email).split("@", 1)[0] if email else "Google user")
     return SocialProfile(
-        provider="GOOGLE",
+        provider="google",
         provider_user_id=subject,
         email=str(email) if email else None,
         email_verified=_verified(payload.get("email_verified")),
-        full_name=str(name)[:150],
-        avatar_url=_avatar(payload.get("picture")),
-    )
-
-
-def _profile_from_facebook(payload: dict) -> SocialProfile:
-    subject = str(payload.get("sub") or "")
-    email = payload.get("email")
-    if not subject:
-        raise OAuthFlowError(401, "Facebook không trả về mã người dùng")
-    verified = payload.get("email_verified")
-    email_verified = _verified(verified) if verified is not None else bool(email)
-    name = payload.get("name") or (str(email).split("@", 1)[0] if email else "Facebook user")
-    return SocialProfile(
-        provider="FACEBOOK",
-        provider_user_id=subject,
-        email=str(email) if email else None,
-        email_verified=email_verified,
         full_name=str(name)[:150],
         avatar_url=_avatar(payload.get("picture")),
     )
@@ -155,34 +126,6 @@ def exchange_google_code(code: str) -> SocialProfile:
     return _profile_from_google(claims)
 
 
-def exchange_facebook_code(code: str) -> SocialProfile:
-    client_id = settings.facebook_client_id
-    client_secret = settings.facebook_client_secret
-    if not client_id or not client_secret or not settings.FACEBOOK_REDIRECT_URI:
-        raise OAuthFlowError(503, "Chưa cấu hình Facebook OAuth")
-    payload = _read_json(
-        "https://graph.facebook.com/v19.0/oauth/access_token?"
-        + urlencode(
-            {
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "redirect_uri": settings.FACEBOOK_REDIRECT_URI,
-                "code": code,
-            }
-        )
-    )
-    id_token = payload.get("id_token")
-    if not id_token:
-        raise OAuthFlowError(401, "Facebook không trả về id_token. Bật OpenID trong ứng dụng Facebook.")
-    claims = _decode_id_token(
-        id_token,
-        _facebook_jwks_client(),
-        audience=client_id,
-        issuers={"https://www.facebook.com"},
-    )
-    return _profile_from_facebook(claims)
-
-
 def verify_google_id_token(id_token: str) -> SocialProfile:
     if not settings.GOOGLE_CLIENT_ID:
         raise OAuthFlowError(503, "Chưa cấu hình GOOGLE_CLIENT_ID")
@@ -193,33 +136,3 @@ def verify_google_id_token(id_token: str) -> SocialProfile:
         issuers={"https://accounts.google.com", "accounts.google.com"},
     )
     return _profile_from_google(claims)
-
-
-def verify_facebook_access_token(access_token: str) -> SocialProfile:
-    client_id = settings.facebook_client_id
-    client_secret = settings.facebook_client_secret
-    if not client_id or not client_secret:
-        raise OAuthFlowError(503, "Chưa cấu hình Facebook OAuth")
-    debug = _read_json(
-        "https://graph.facebook.com/debug_token?"
-        + urlencode({"input_token": access_token, "access_token": f"{client_id}|{client_secret}"})
-    )
-    token_data = debug.get("data") or {}
-    if not token_data.get("is_valid") or str(token_data.get("app_id")) != client_id:
-        raise OAuthFlowError(401, "Token Facebook không hợp lệ")
-    profile = _read_json(
-        "https://graph.facebook.com/me?"
-        + urlencode({"fields": "id,name,email,picture.type(large)", "access_token": access_token})
-    )
-    subject = str(profile.get("id") or token_data.get("user_id") or "")
-    email = profile.get("email")
-    picture = profile.get("picture") or {}
-    avatar = picture.get("data", {}).get("url") if isinstance(picture, dict) else None
-    return SocialProfile(
-        provider="FACEBOOK",
-        provider_user_id=subject,
-        email=str(email) if email else None,
-        email_verified=bool(email),
-        full_name=str(profile.get("name") or "Facebook user")[:150],
-        avatar_url=_avatar(avatar),
-    )

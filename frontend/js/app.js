@@ -124,7 +124,6 @@ function renderAuth() {
       </form>
       <div class="social">
         <button class="btn google" id="google-login" type="button">Continue with Google</button>
-        <button class="btn facebook" id="facebook-login" type="button">Continue with Facebook</button>
       </div>
     </section>`;
   app.querySelectorAll("[data-mode]").forEach((button) => {
@@ -142,7 +141,6 @@ function renderAuth() {
     };
   };
   startOAuth(app.querySelector("#google-login"), "/auth/google/login");
-  startOAuth(app.querySelector("#facebook-login"), "/auth/facebook/login");
   app.querySelector("#auth-form").onsubmit = async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
