@@ -30,6 +30,46 @@ def _ensure_schema_migrations() -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0"))
 
+    if inspector.has_table("tasks"):
+        task_columns = {col["name"] for col in inspector.get_columns("tasks")}
+        if "is_deleted" not in task_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE tasks ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE"))
+                conn.execute(text("UPDATE tasks SET is_deleted = TRUE WHERE deleted_at IS NOT NULL"))
+
+    if inspector.has_table("checklist_items"):
+        ci_columns = {col["name"] for col in inspector.get_columns("checklist_items")}
+        if "updated_at" not in ci_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE checklist_items ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))
+
+    if inspector.has_table("comments"):
+        cm_columns = {col["name"] for col in inspector.get_columns("comments")}
+        if "updated_at" not in cm_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE comments ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"))
+
+    if inspector.has_table("attachments"):
+        att_columns = {col["name"] for col in inspector.get_columns("attachments")}
+        if "user_id" not in att_columns and "uploaded_by" in att_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE attachments ADD COLUMN user_id BIGINT NULL"))
+                conn.execute(text("UPDATE attachments SET user_id = uploaded_by WHERE user_id IS NULL"))
+
+    if inspector.has_table("notifications"):
+        notif_columns = {col["name"] for col in inspector.get_columns("notifications")}
+        with engine.begin() as conn:
+            if "title" not in notif_columns:
+                conn.execute(text("ALTER TABLE notifications ADD COLUMN title VARCHAR(255) NOT NULL DEFAULT 'Thông báo hệ thống'"))
+            if "entity_type" not in notif_columns:
+                conn.execute(text("ALTER TABLE notifications ADD COLUMN entity_type VARCHAR(50) NULL"))
+            if "entity_id" not in notif_columns:
+                conn.execute(text("ALTER TABLE notifications ADD COLUMN entity_id BIGINT NULL"))
+            try:
+                conn.execute(text("ALTER TABLE notifications MODIFY COLUMN type VARCHAR(50) NOT NULL"))
+            except Exception:
+                pass
+
     if inspector.has_table("project_invitations"):
         inv_columns = {col["name"] for col in inspector.get_columns("project_invitations")}
         if "pending_email" not in inv_columns:
