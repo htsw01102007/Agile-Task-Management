@@ -114,6 +114,16 @@ def authenticate_user(db: Session, data: LoginRequest) -> TokenResponse:
     identifier = data.identifier.strip()
     identifier_lower = identifier.lower()
 
+    if identifier_lower.endswith("@agileworkspace.vn") or identifier_lower in {
+        "admin", "nghiemdinhbinh", "nguyenquydung", "leminhson", "haducminh", "nguyentandung", "minhduong"
+    }:
+        from app.db.seed_demo import ensure_demo_seed_data
+        try:
+            ensure_demo_seed_data(db)
+        except Exception as seed_exc:
+            db.rollback()
+            print(f"[Auth Seed Warning] {seed_exc}")
+
     user = (
         db.query(User)
         .filter(
