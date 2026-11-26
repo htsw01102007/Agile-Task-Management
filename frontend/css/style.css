@@ -932,14 +932,24 @@ textarea::placeholder {
 /* Dashboard 2-Column Workspace Layout */
 .dashboard-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 320px);
   gap: 20px;
   align-items: start;
+  width: 100%;
+  min-width: 0;
+}
+
+.dashboard-workspace > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .dashboard-side {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
+  min-width: 0;
+  width: 100%;
 }
 
 .content-panel {
@@ -948,6 +958,7 @@ textarea::placeholder {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow-xs);
+  min-width: 0;
 }
 
 .panel-heading {
@@ -1013,7 +1024,9 @@ textarea::placeholder {
 /* Mini Task List Widget on Dashboard */
 .mini-task-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
+  min-width: 0;
 }
 
 .mini-task-item {
@@ -1025,6 +1038,8 @@ textarea::placeholder {
   border-radius: var(--radius-xs);
   background: var(--surface-hover);
   transition: all 0.14s ease;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .mini-task-item:hover {
@@ -1053,6 +1068,9 @@ textarea::placeholder {
   color: var(--muted);
   font-size: 11px;
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ==========================================================================
@@ -2425,59 +2443,221 @@ progress::-moz-progress-bar {
   margin-top: 0 !important;
 }
 
+.checklist-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.checklist-empty {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--bg);
+  font-size: 12.5px;
+  text-align: center;
+}
+
 .checklist-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  padding: 8px 4px;
-  border-bottom: 1px solid var(--line-subtle);
-  font-size: 12.5px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  font-size: 13px;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.checklist-item:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-xs);
+}
+
+.checklist-item.is-done {
+  background: var(--bg-subtle);
+  border-color: var(--line-subtle);
 }
 
 .checklist-item input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex: none;
   accent-color: var(--accent);
   cursor: pointer;
 }
 
-.checklist-item span {
+.checklist-item-text {
   flex: 1;
+  min-width: 0;
+  line-height: 1.48;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.checklist-item.is-done .checklist-item-text {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.checklist-composer {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.checklist-composer input {
+  flex: 1;
+  min-width: 0;
+}
+
+.checklist-composer button {
+  margin-top: 0 !important;
+  flex: none;
+  white-space: nowrap;
+}
+
+.comment-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
 }
 
 .task-comment {
   display: flex;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--line-subtle);
-  font-size: 12.5px;
+  align-items: flex-start;
+  gap: 11px;
+  font-size: 13px;
 }
 
 .comment-avatar {
   display: grid;
   place-items: center;
   flex: none;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  margin-top: 2px;
   border-radius: 50%;
   background: var(--accent-t);
+  border: 1px solid var(--accent-border);
   color: var(--accent);
   font-size: 11px;
+  font-weight: 700;
+  object-fit: cover;
+}
+
+.task-comment .task-comment-body {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease;
+}
+
+.task-comment.is-own .task-comment-body {
+  background: #f8f9ff;
+  border-color: #dbe2fe;
+}
+
+.comment-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.comment-meta strong {
+  font-size: 12.8px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.comment-you-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: var(--accent-t);
+  color: var(--accent);
+  font-size: 10px;
   font-weight: 700;
 }
 
 .task-comment time,
 .team-person small {
-  display: block;
   color: var(--muted);
   font-size: 11px;
 }
 
-.task-comment p {
-  margin: 4px 0 0;
+.team-person small {
+  display: block;
+}
+
+.task-comment .comment-content {
+  margin: 6px 0 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  line-height: 1.55;
   color: var(--ink-secondary);
+}
+
+.comment-composer {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.comment-composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.comment-composer textarea {
+  width: 100%;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 10px 12px;
+  resize: vertical;
+  min-height: 64px;
+  background: transparent;
+}
+
+.comment-composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--bg);
+  border-top: 1px solid var(--line-subtle);
+}
+
+.comment-composer-footer .muted {
+  font-size: 11px;
+}
+
+.comment-composer-footer kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.comment-composer-footer button {
+  margin-top: 0 !important;
 }
 
 /* Team & Invitations Modal */
@@ -3263,16 +3443,25 @@ table tbody tr:hover {
 /* ==========================================================================
    Responsive Breakpoints
    ========================================================================== */
-@media (max-width: 1120px) {
+@media (max-width: 1240px) {
   .dashboard-workspace {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
+  .dashboard-side {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1120px) {
   .overview-grid-4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 920px) {
+  .dashboard-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .auth-split {
     grid-template-columns: 1fr;
   }
@@ -3954,20 +4143,33 @@ svg.icon {
 .checklist-actions {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   flex: none;
+  margin-left: auto;
 }
 
 .checklist-actions .column-action {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   padding: 0;
+  border-radius: 6px;
   display: grid;
   place-items: center;
+  color: var(--muted);
+}
+
+.checklist-actions .column-action:hover:not(:disabled) {
+  background: var(--bg-subtle);
+  color: var(--ink);
+}
+
+.checklist-actions .column-action.danger-icon:hover:not(:disabled) {
+  background: var(--err-bg);
+  color: var(--err-ink);
 }
 
 .checklist-actions .column-action:disabled {
-  opacity: 0.3;
+  opacity: 0.28;
   cursor: not-allowed;
 }
 
@@ -3982,7 +4184,7 @@ svg.icon {
 
 .comment-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
@@ -3995,15 +4197,23 @@ svg.icon {
 }
 
 .comment-action-btn {
-  padding: 2px 7px;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink-secondary);
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.comment-action-btn svg.icon {
+  width: 12px;
+  height: 12px;
 }
 
 .comment-action-btn:hover {

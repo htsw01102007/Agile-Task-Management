@@ -944,47 +944,63 @@ function renderChecklist(summary) {
   const totalCount = summary.total_items || 0;
   const pct = Math.round(summary.progress_percent || 0);
   currentChecklistItems = summary.items || [];
-  document.getElementById("checklist-progress").textContent = `${completedCount}/${totalCount} · ${pct}%`;
+  const badge = document.getElementById("checklist-progress");
+  if (badge) {
+    badge.textContent = `${completedCount}/${totalCount} · ${pct}%`;
+    badge.classList.toggle("status-active", pct >= 100 && totalCount > 0);
+  }
   const fill = document.getElementById("checklist-progress-fill");
   if (fill) {
     fill.style.width = `${pct}%`;
     fill.style.background = pct >= 100 && totalCount > 0 ? "var(--ok)" : "var(--accent)";
   }
   document.getElementById("checklist-items").innerHTML = currentChecklistItems.length ? currentChecklistItems.map((item, idx) => `
-    <div class="checklist-item" data-checklist-id="${item.id}">
+    <div class="checklist-item${item.is_done ? " is-done" : ""}" data-checklist-id="${item.id}">
       <input type="checkbox" ${item.is_done ? "checked" : ""} ${canEdit ? "" : "disabled"}>
-      <span style="${item.is_done ? "text-decoration:line-through;color:var(--muted);" : ""}">${escapeHtml(item.content)}</span>
+      <span class="checklist-item-text">${escapeHtml(item.content)}</span>
       ${canEdit ? `<span class="checklist-actions">
         <button type="button" class="column-action" data-checklist-move="up" data-checklist-id="${item.id}" title="Đưa lên trên" aria-label="Đưa lên trên" ${idx === 0 ? "disabled" : ""}>${iconSvg("chevronUp")}</button>
         <button type="button" class="column-action icon-rotate-down" data-checklist-move="down" data-checklist-id="${item.id}" title="Đưa xuống dưới" aria-label="Đưa xuống dưới" ${idx === currentChecklistItems.length - 1 ? "disabled" : ""}>${iconSvg("chevronUp")}</button>
         <button type="button" class="column-action" data-checklist-edit="${item.id}" title="Sửa mục" aria-label="Sửa mục">${iconSvg("edit")}</button>
-        <button type="button" class="column-action" data-checklist-delete="${item.id}" title="Xoá mục" aria-label="Xoá mục">${iconSvg("trash")}</button>
+        <button type="button" class="column-action danger-icon" data-checklist-delete="${item.id}" title="Xoá mục" aria-label="Xoá mục">${iconSvg("trash")}</button>
       </span>` : ""}
-    </div>`).join("") : '<p class="muted">Chưa có mục checklist nào.</p>';
+    </div>`).join("") : '<p class="checklist-empty muted">Chưa có mục kiểm tra nào cho công việc này.</p>';
   document.getElementById("checklist-form").hidden = !canEdit;
 }
 
 function renderComments(comments) {
   currentComments = comments || [];
+  const countBadge = document.getElementById("comments-count-badge");
+  if (countBadge) countBadge.textContent = `${currentComments.length} bình luận`;
+
   document.getElementById("task-comments").innerHTML = currentComments.length ? currentComments.map((comment) => {
-    const canModify = canEdit && (comment.user_id === currentUser?.id || ["owner", "manager"].includes(projectData?.user_role));
-    return `<article class="task-comment" data-comment-id="${comment.id}">
-      <span class="comment-avatar">${escapeHtml(initials(comment.user_full_name || "Người dùng"))}</span>
+    const isAuthor = Number(comment.user_id) === Number(currentUser?.id);
+    const canEditComment = canEdit && isAuthor;
+    const canDeleteComment = canEdit && (isAuthor || projectData?.user_role === "owner");
+    const isEdited = comment.updated_at && comment.created_at && new Date(comment.updated_at).getTime() - new Date(comment.created_at).getTime() > 2000;
+    const authorName = comment.user_full_name || comment.user_email || "Tài khoản";
+    const avatarMarkup = comment.user_avatar_url
+      ? `<img class="comment-avatar" src="${escapeHtml(comment.user_avatar_url)}" alt="${escapeHtml(authorName)}">`
+      : `<span class="comment-avatar">${escapeHtml(initials(authorName))}</span>`;
+
+    return `<article class="task-comment${isAuthor ? " is-own" : ""}" data-comment-id="${comment.id}">
+      ${avatarMarkup}
       <div class="task-comment-body">
         <div class="comment-header">
-          <div>
-            <strong>${escapeHtml(comment.user_full_name || "Tài khoản")}</strong>
-            <time>${escapeHtml(formatDateTime(comment.created_at))}</time>
+          <div class="comment-meta">
+            <strong>${escapeHtml(authorName)}</strong>
+            ${isAuthor ? '<span class="comment-you-tag">Bạn</span>' : ""}
+            <time>${escapeHtml(formatDateTime(comment.created_at))}${isEdited ? " · đã chỉnh sửa" : ""}</time>
           </div>
-          ${canModify ? `<span class="comment-actions">
-            <button type="button" class="comment-action-btn" data-comment-edit="${comment.id}">Sửa</button>
-            <button type="button" class="comment-action-btn danger" data-comment-delete="${comment.id}">Xoá</button>
+          ${(canEditComment || canDeleteComment) ? `<span class="comment-actions">
+            ${canEditComment ? `<button type="button" class="comment-action-btn" data-comment-edit="${comment.id}">${iconSvg("edit")} <span>Sửa</span></button>` : ""}
+            ${canDeleteComment ? `<button type="button" class="comment-action-btn danger" data-comment-delete="${comment.id}">${iconSvg("trash")} <span>Xoá</span></button>` : ""}
           </span>` : ""}
         </div>
-        <p>${escapeHtml(comment.content)}</p>
+        <p class="comment-content">${escapeHtml(comment.content)}</p>
       </div>
     </article>`;
-  }).join("") : '<p class="muted">Chưa có bình luận nào.</p>';
+  }).join("") : '<p class="checklist-empty muted">Chưa có bình luận nào. Hãy mở đầu cuộc trao đổi!</p>';
   document.getElementById("comment-form").hidden = !canEdit;
 }
 
@@ -1051,6 +1067,20 @@ document.getElementById("task-attachments").addEventListener("click", async (eve
     URL.revokeObjectURL(objectUrl);
   } catch (error) {
     showToast(error.message, "error");
+  }
+});
+
+document.getElementById("checklist-form").querySelector('[name="content"]').addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    document.getElementById("checklist-form").querySelector("button").click();
+  }
+});
+
+document.getElementById("comment-form").querySelector('[name="content"]').addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    event.preventDefault();
+    document.getElementById("comment-form").querySelector("button").click();
   }
 });
 

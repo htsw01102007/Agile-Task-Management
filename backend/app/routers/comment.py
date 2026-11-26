@@ -168,15 +168,15 @@ def update_comment(
     db: Session = Depends(get_db),
     data: tuple = Depends(get_task_with_write_check),
 ):
-    """Cập nhật bình luận (tác giả hoặc owner/manager)"""
+    """Cập nhật bình luận (chỉ người viết bình luận đó mới có quyền sửa)"""
     task, member = data
 
     comment = db.query(Comment).filter(Comment.id == comment_id, Comment.task_id == task_id).first()
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bình luận không tồn tại")
 
-    if comment.user_id != member.user_id and member.role not in ["owner", "manager"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn không có quyền sửa bình luận này")
+    if comment.user_id != member.user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ người viết bình luận mới có quyền sửa bình luận này")
 
     old_mentions = _extract_mentioned_member_ids(db, project_id, comment.content, exclude_user_id=member.user_id)
     new_mentions = _extract_mentioned_member_ids(db, project_id, comment_update.content, exclude_user_id=member.user_id)
@@ -222,15 +222,15 @@ def delete_comment(
     db: Session = Depends(get_db),
     data: tuple = Depends(get_task_with_write_check),
 ):
-    """Xoá bình luận (tác giả tự xoá, hoặc owner/manager xoá được của người khác)"""
+    """Xoá bình luận (chỉ người viết bình luận hoặc Owner của dự án)"""
     task, member = data
 
     comment = db.query(Comment).filter(Comment.id == comment_id, Comment.task_id == task_id).first()
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bình luận không tồn tại")
 
-    if comment.user_id != member.user_id and member.role not in ["owner", "manager"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn không có quyền xoá bình luận này")
+    if comment.user_id != member.user_id and member.role != "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ người viết bình luận hoặc Owner dự án mới có quyền xoá bình luận này")
 
     db.delete(comment)
     db.commit()

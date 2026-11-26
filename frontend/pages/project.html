@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="icon" href="../assets/images/logo.svg">
-  <link rel="stylesheet" href="../css/style.css?v=20261126">
+  <link rel="stylesheet" href="../css/style.css?v=20261127">
 </head>
 
 <body data-root="../">
@@ -286,10 +286,10 @@
                     <div id="checklist-progress-fill" class="health-fill" style="width: 0%;"></div>
                   </div>
                 </div>
-                <div id="checklist-items"></div>
-                <div id="checklist-form" class="inline-form">
-                  <input name="content" maxlength="500" placeholder="Thêm đầu việc con cần kiểm tra…">
-                  <button class="btn btn-small" type="button">＋ Thêm mục</button>
+                <div id="checklist-items" class="checklist-list"></div>
+                <div id="checklist-form" class="checklist-composer">
+                  <input name="content" maxlength="500" placeholder="Nhập mục cần kiểm tra rồi nhấn Enter hoặc bấm Thêm mục…">
+                  <button class="btn btn-small btn-primary" type="button">＋ Thêm mục</button>
                 </div>
               </section>
 
@@ -297,11 +297,15 @@
               <section id="comments-panel" class="task-subpanel" hidden>
                 <div class="subpanel-heading">
                   <h3>Trao đổi &amp; Bình luận</h3>
+                  <span id="comments-count-badge" class="role-badge">0 bình luận</span>
                 </div>
-                <div id="task-comments"></div>
-                <div id="comment-form" class="inline-form">
-                  <textarea name="content" rows="2" placeholder="Viết bình luận hoặc cập nhật tiến độ…"></textarea>
-                  <button class="btn btn-small btn-primary" type="button">Gửi</button>
+                <div id="task-comments" class="comment-list"></div>
+                <div id="comment-form" class="comment-composer">
+                  <textarea name="content" rows="2" placeholder="Viết bình luận, phản hồi hoặc nhắc tên @username…"></textarea>
+                  <div class="comment-composer-footer">
+                    <span class="muted">Mẹo: Nhấn <kbd>Ctrl</kbd> + <kbd>Enter</kbd> để gửi nhanh</span>
+                    <button class="btn btn-small btn-primary" type="button">Gửi bình luận</button>
+                  </div>
                 </div>
               </section>
 
@@ -443,11 +447,11 @@
   <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
-  <script src="../js/config.js?v=20261126"></script>
-  <script src="../js/api.js?v=20261126"></script>
-  <script src="../js/utils.js?v=20261126"></script>
-  <script src="../js/layout.js?v=20261126"></script>
-  <script src="../js/pages/project.js?v=20261126"></script>
+  <script src="../js/config.js?v=20261127"></script>
+  <script src="../js/api.js?v=20261127"></script>
+  <script src="../js/utils.js?v=20261127"></script>
+  <script src="../js/layout.js?v=20261127"></script>
+  <script src="../js/pages/project.js?v=20261127"></script>
 </body>
 
 </html>
