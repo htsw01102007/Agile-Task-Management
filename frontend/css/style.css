@@ -4296,3 +4296,303 @@ svg.icon {
   gap: 6px;
   flex: none;
 }
+
+/* ==========================================================================
+   Click-to-Toggle Assignee & Integrated Label Picker / Manager (Task Modal)
+   ========================================================================== */
+.picker-section {
+  margin-top: 14px;
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.picker-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.picker-count.has-value {
+  background: var(--accent-t);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.picker-list {
+  display: grid;
+  gap: 5px;
+  max-height: 176px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.picker-empty {
+  margin: 0;
+  padding: 10px 8px;
+  text-align: center;
+  font-size: 11.5px;
+}
+
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.picker-item:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--line);
+}
+
+.picker-item.is-selected {
+  background: var(--accent-t);
+  border-color: var(--accent-border);
+}
+
+.picker-item:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.picker-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-subtle);
+  border: 1px solid var(--line);
+  color: var(--ink-secondary);
+  font-size: 10.5px;
+  font-weight: 700;
+  object-fit: cover;
+}
+
+.picker-item.is-selected .picker-avatar {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.picker-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-item-info strong {
+  display: block;
+  font-size: 12.2px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.picker-item-info small {
+  display: block;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.picker-check {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface);
+  color: transparent;
+  transition: all 0.14s ease;
+}
+
+.picker-check svg.icon {
+  width: 11px;
+  height: 11px;
+  stroke-width: 2.8;
+}
+
+.picker-item.is-selected .picker-check,
+.label-picker-row.is-selected .picker-check {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+/* Integrated Label Picker + Edit/Delete Tools */
+.label-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 5px 3px 3px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  transition: all 0.14s ease;
+}
+
+.label-picker-row:hover {
+  background: var(--surface-hover);
+  border-color: var(--line);
+}
+
+.label-picker-row.is-selected {
+  background: color-mix(in srgb, var(--lb-color, var(--accent)) 11%, #ffffff);
+  border-color: color-mix(in srgb, var(--lb-color, var(--accent)) 38%, transparent);
+}
+
+.label-pick-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.label-pick-main:disabled {
+  cursor: default;
+}
+
+.label-pick-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.2px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.label-inline-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.label-inline-tools .column-action {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.label-inline-tools .column-action:hover {
+  background: var(--bg-subtle);
+  color: var(--ink);
+}
+
+.label-inline-tools .column-action.danger-icon:hover {
+  background: var(--err-bg);
+  color: var(--err-ink);
+}
+
+/* Inline Label Creator / Editor inside Task Modal */
+.inline-label-editor {
+  margin-bottom: 8px;
+  padding: 10px 11px;
+  background: var(--surface);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-xs);
+  display: grid;
+  gap: 8px;
+}
+
+.inline-label-editor-top strong {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.inline-label-editor input[type="text"] {
+  width: 100%;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.inline-label-colors {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.inline-swatches {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.color-swatch:hover {
+  transform: scale(1.12);
+}
+
+.color-swatch.active {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
+}
+
+.inline-label-colors input[type="color"] {
+  width: 28px;
+  height: 24px;
+  padding: 1px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.inline-label-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.inline-label-actions button {
+  margin-top: 0 !important;
+}

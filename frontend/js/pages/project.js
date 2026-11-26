@@ -533,13 +533,16 @@ function buildTaskPayload() {
   };
 }
 
+let pickedAssigneeIds = new Set();
+let pickedLabelIds = new Set();
+let editingInlineLabelId = null;
+
 function selectedAssigneeIds() {
-  return Array.from(taskForm.elements.assignee_ids.selectedOptions).map((option) => Number(option.value));
+  return [...pickedAssigneeIds];
 }
 
 function selectedLabelIds() {
-  if (!taskForm.elements.label_ids) return [];
-  return Array.from(taskForm.elements.label_ids.selectedOptions).map((option) => Number(option.value));
+  return [...pickedLabelIds];
 }
 
 function populateTaskLists(selectedId) {
@@ -548,24 +551,134 @@ function populateTaskLists(selectedId) {
     .join("");
 }
 
+function updateAssigneeCountBadge() {
+  const countEl = document.getElementById("assignee-picked-count");
+  if (countEl) {
+    countEl.textContent = pickedAssigneeIds.size ? `${pickedAssigneeIds.size} đã chọn` : "Chưa chọn";
+    countEl.classList.toggle("has-value", pickedAssigneeIds.size > 0);
+  }
+}
+
+function renderAssigneePickerList() {
+  const container = document.getElementById("task-assignees-list");
+  if (!container) return;
+  const assignable = members.filter((member) => member.role !== "viewer" && member.user?.is_active !== false);
+  updateAssigneeCountBadge();
+  if (!assignable.length) {
+    container.innerHTML = '<p class="picker-empty muted">Chưa có thành viên đủ quyền nhận việc.</p>';
+    return;
+  }
+  const roleMap = { owner: "Owner", manager: "Manager", member: "Member" };
+  container.innerHTML = assignable.map((member) => {
+    const uid = Number(member.user_id);
+    const selected = pickedAssigneeIds.has(uid);
+    const name = member.user?.full_name || member.user?.email || `Thành viên #${uid}`;
+    const avatar = member.user?.avatar_url
+      ? `<img class="picker-avatar" src="${escapeHtml(member.user.avatar_url)}" alt="${escapeHtml(name)}">`
+      : `<span class="picker-avatar">${escapeHtml(initials(name))}</span>`;
+    return `<button type="button" class="picker-item${selected ? " is-selected" : ""}" data-pick-assignee="${uid}" aria-pressed="${selected}" ${!canEdit ? "disabled" : ""}>
+      ${avatar}
+      <span class="picker-item-info">
+        <strong>${escapeHtml(name)}</strong>
+        <small>${escapeHtml(roleMap[member.role] || member.role)}</small>
+      </span>
+      <span class="picker-check" aria-hidden="true">${selected ? iconSvg("check") : ""}</span>
+    </button>`;
+  }).join("");
+}
+
 function populateAssignees(selectedIds = []) {
-  taskForm.elements.assignee_ids.innerHTML = members
-    .filter((member) => member.role !== "viewer" && member.user?.is_active !== false)
-    .map((member) => `<option value="${member.user_id}" ${selectedIds.includes(member.user_id) ? "selected" : ""}>${escapeHtml(member.user?.full_name || member.user?.email || `Thành viên #${member.user_id}`)}</option>`)
-    .join("");
+  pickedAssigneeIds = new Set(selectedIds.map(Number));
+  renderAssigneePickerList();
+}
+
+function updateLabelCountBadge() {
+  const countEl = document.getElementById("label-picked-count");
+  if (countEl) {
+    countEl.textContent = pickedLabelIds.size ? `${pickedLabelIds.size} đã chọn` : "Chưa chọn";
+    countEl.classList.toggle("has-value", pickedLabelIds.size > 0);
+  }
+}
+
+function closeInlineLabelEditor() {
+  editingInlineLabelId = null;
+  const editor = document.getElementById("inline-label-editor");
+  const nameInput = document.getElementById("inline-label-name");
+  if (editor) editor.hidden = true;
+  if (nameInput) {
+    nameInput.value = "";
+    clearFieldError(nameInput);
+  }
+}
+
+function openInlineLabelEditor(label = null) {
+  const editor = document.getElementById("inline-label-editor");
+  const titleEl = document.getElementById("inline-label-editor-title");
+  const nameInput = document.getElementById("inline-label-name");
+  const colorInput = document.getElementById("inline-label-color");
+  if (!editor || !nameInput || !colorInput) return;
+
+  editingInlineLabelId = label ? Number(label.id) : null;
+  if (titleEl) titleEl.textContent = label ? `Chỉnh sửa nhãn "${label.name}"` : "Tạo nhãn phân loại mới";
+  nameInput.value = label?.name || "";
+  const colorVal = (label?.color || "#5E6AD2").toUpperCase();
+  colorInput.value = /^#[0-9A-F]{6}$/i.test(colorVal) ? colorVal : "#5E6AD2";
+  syncInlineColorSwatches(colorInput.value);
+  clearFieldError(nameInput);
+  editor.hidden = false;
+  nameInput.focus();
+}
+
+function syncInlineColorSwatches(activeHex) {
+  const normalized = (activeHex || "").toUpperCase();
+  document.querySelectorAll("#inline-label-swatches .color-swatch").forEach((btn) => {
+    btn.classList.toggle("active", (btn.dataset.swatch || "").toUpperCase() === normalized);
+  });
+}
+
+function renderLabelPickerList() {
+  const container = document.getElementById("task-labels-list");
+  const toggleCreateBtn = document.getElementById("toggle-inline-label-btn");
+  if (toggleCreateBtn) toggleCreateBtn.hidden = !canManageLists;
+  updateLabelCountBadge();
+  if (!container) return;
+
+  if (!projectLabels.length) {
+    container.innerHTML = `<p class="picker-empty muted">${canManageLists ? 'Chưa có nhãn nào. Nhấn "＋ Tạo nhãn" để thêm mới.' : "Dự án chưa có nhãn phân loại."}</p>`;
+    return;
+  }
+
+  container.innerHTML = projectLabels.map((lb) => {
+    const lid = Number(lb.id);
+    const selected = pickedLabelIds.has(lid);
+    const color = lb.color || "#64748b";
+    return `<div class="label-picker-row${selected ? " is-selected" : ""}" style="--lb-color:${escapeHtml(color)};">
+      <button type="button" class="label-pick-main" data-pick-label="${lid}" aria-pressed="${selected}" ${!canEdit ? "disabled" : ""}>
+        <span class="label-color-dot" style="background:${escapeHtml(color)};"></span>
+        <span class="label-pick-name">${escapeHtml(lb.name)}</span>
+        <span class="picker-check" aria-hidden="true">${selected ? iconSvg("check") : ""}</span>
+      </button>
+      ${canManageLists ? `<span class="label-inline-tools">
+        <button type="button" class="column-action" data-inline-edit-label="${lid}" title="Đổi tên / màu nhãn" aria-label="Sửa nhãn">${iconSvg("edit")}</button>
+        <button type="button" class="column-action danger-icon" data-inline-delete-label="${lid}" title="Xoá nhãn khỏi dự án" aria-label="Xoá nhãn">${iconSvg("trash")}</button>
+      </span>` : ""}
+    </div>`;
+  }).join("");
 }
 
 function populateLabels(selectedIds = []) {
-  if (!taskForm.elements.label_ids) return;
-  taskForm.elements.label_ids.innerHTML = projectLabels
-    .map((lb) => `<option value="${lb.id}" ${selectedIds.includes(lb.id) ? "selected" : ""}>${escapeHtml(lb.name)} (${escapeHtml(lb.color)})</option>`)
-    .join("");
-  const createLabelBtn = document.getElementById("create-label-btn");
-  if (createLabelBtn) createLabelBtn.hidden = !canManageLists;
+  pickedLabelIds = new Set(selectedIds.map(Number));
+  closeInlineLabelEditor();
+  renderLabelPickerList();
 }
 
 function setTaskFormReadOnly(readOnly) {
-  taskForm.querySelectorAll("input, textarea, select").forEach((input) => { input.disabled = readOnly; });
+  taskForm.querySelectorAll("input:not(#inline-label-name):not(#inline-label-color), textarea, select").forEach((input) => {
+    input.disabled = readOnly;
+  });
+  taskForm.querySelectorAll("[data-pick-assignee], [data-pick-label]").forEach((btn) => {
+    btn.disabled = readOnly;
+  });
   document.getElementById("task-submit").hidden = readOnly;
 }
 
@@ -643,114 +756,152 @@ async function syncLabels(taskId, selectedIds) {
   for (const id of removeIds) await api.delete(`/projects/${projectId}/tasks/${taskId}/labels/${id}`);
 }
 
-document.getElementById("create-label-btn")?.addEventListener("click", async () => {
-  const modalResult = await showLabelModal();
-  if (!modalResult) return;
-  try {
-    const created = await api.post(`/projects/${projectId}/labels`, modalResult);
-    projectLabels.push(created);
-    const currentSelected = selectedLabelIds();
-    currentSelected.push(created.id);
-    populateLabels(currentSelected);
-    populateLabelFilter();
-    showToast(`Đã tạo nhãn "${created.name}"`);
-  } catch (error) {
-    showToast(error.message, "error");
+// Click chọn / bỏ chọn người thực hiện
+document.getElementById("task-assignees-list")?.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-pick-assignee]");
+  if (!btn || btn.disabled || !canEdit) return;
+  const uid = Number(btn.dataset.pickAssignee);
+  if (pickedAssigneeIds.has(uid)) pickedAssigneeIds.delete(uid);
+  else pickedAssigneeIds.add(uid);
+  renderAssigneePickerList();
+});
+
+// Tích hợp chọn / bỏ chọn nhãn + Quản lý nhãn (Tạo / Sửa / Xoá) ngay trong mục Nhãn phân loại
+document.getElementById("toggle-inline-label-btn")?.addEventListener("click", () => {
+  const editor = document.getElementById("inline-label-editor");
+  if (editor && !editor.hidden && editingInlineLabelId === null) {
+    closeInlineLabelEditor();
+  } else {
+    openInlineLabelEditor(null);
   }
 });
 
-function renderLabelsManager() {
-  const container = document.getElementById("project-labels-list");
-  if (!container) return;
-  if (!projectLabels.length) {
-    container.innerHTML = '<p class="empty-state">Dự án chưa có nhãn phân loại nào.</p>';
+document.getElementById("inline-label-cancel")?.addEventListener("click", closeInlineLabelEditor);
+
+document.getElementById("inline-label-swatches")?.addEventListener("click", (event) => {
+  const swatch = event.target.closest("[data-swatch]");
+  if (!swatch) return;
+  const colorInput = document.getElementById("inline-label-color");
+  if (colorInput) {
+    colorInput.value = swatch.dataset.swatch;
+    syncInlineColorSwatches(colorInput.value);
+  }
+});
+
+document.getElementById("inline-label-color")?.addEventListener("input", (event) => {
+  syncInlineColorSwatches(event.target.value);
+});
+
+document.getElementById("inline-label-name")?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    document.getElementById("inline-label-save")?.click();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    closeInlineLabelEditor();
+  }
+});
+
+document.getElementById("inline-label-save")?.addEventListener("click", async () => {
+  const nameInput = document.getElementById("inline-label-name");
+  const colorInput = document.getElementById("inline-label-color");
+  const saveBtn = document.getElementById("inline-label-save");
+  if (!nameInput || !colorInput) return;
+
+  const name = nameInput.value.trim();
+  const color = (colorInput.value || "#5E6AD2").toUpperCase();
+  if (!name) {
+    setFieldError(nameInput, "Vui lòng nhập tên nhãn.");
+    nameInput.focus();
     return;
   }
-  container.innerHTML = projectLabels.map((lb) => `
-    <div class="label-manager-row">
-      <span class="label-color-dot" style="background:${escapeHtml(lb.color || "#808080")};"></span>
-      <span class="label-manager-info">
-        <span class="task-label-chip" style="background:${escapeHtml(lb.color || "#64748b")}22;color:${escapeHtml(lb.color || "#64748b")};border:1px solid ${escapeHtml(lb.color || "#64748b")}55;">${escapeHtml(lb.name)}</span>
-        <code>${escapeHtml(lb.color || "#808080")}</code>
-      </span>
-      <span class="label-manager-actions">
-        <button class="btn btn-small" type="button" data-edit-label="${lb.id}">Sửa</button>
-        <button class="btn btn-small btn-danger" type="button" data-delete-label="${lb.id}">Xoá</button>
-      </span>
-    </div>`).join("");
-}
+  clearFieldError(nameInput);
+  if (saveBtn) saveBtn.disabled = true;
 
-async function openLabelsDialog() {
-  if (!labelsDialog) return;
-  if (!labelsDialog.open) labelsDialog.showModal();
-  const container = document.getElementById("project-labels-list");
-  if (container) container.innerHTML = '<p class="muted">Đang tải danh sách nhãn…</p>';
   try {
-    projectLabels = await api.get(`/projects/${projectId}/labels`);
-    renderLabelsManager();
-    populateLabelFilter();
-  } catch (error) {
-    if (container) container.innerHTML = `<p class="status status-error">${escapeHtml(error.message)}</p>`;
-  }
-}
-
-labelsManageButton?.addEventListener("click", openLabelsDialog);
-document.querySelectorAll("[data-close-labels]").forEach((btn) => btn.addEventListener("click", () => labelsDialog?.close()));
-labelsDialog?.addEventListener("click", (event) => {
-  if (event.target === labelsDialog) labelsDialog.close();
-});
-document.getElementById("add-label-from-manager")?.addEventListener("click", async () => {
-  const modalResult = await showLabelModal();
-  if (!modalResult) return;
-  try {
-    const created = await api.post(`/projects/${projectId}/labels`, modalResult);
-    projectLabels.push(created);
-    renderLabelsManager();
-    populateLabelFilter();
-    showToast(`Đã tạo nhãn "${created.name}"`);
-  } catch (error) {
-    showToast(error.message, "error");
-  }
-});
-document.getElementById("project-labels-list")?.addEventListener("click", async (event) => {
-  const editBtn = event.target.closest("[data-edit-label]");
-  const deleteBtn = event.target.closest("[data-delete-label]");
-  if (editBtn) {
-    const label = projectLabels.find((lb) => lb.id === Number(editBtn.dataset.editLabel));
-    if (!label) return;
-    const modalResult = await showLabelModal(label);
-    if (!modalResult) return;
-    try {
-      const updated = await api.put(`/projects/${projectId}/labels/${label.id}`, modalResult);
+    if (editingInlineLabelId) {
+      const updated = await api.put(`/projects/${projectId}/labels/${editingInlineLabelId}`, { name, color });
       projectLabels = projectLabels.map((lb) => (lb.id === updated.id ? updated : lb));
-      renderLabelsManager();
+      if (boardData?.tasks) {
+        boardData.tasks.forEach((t) => {
+          (t.labels || []).forEach((tl) => {
+            if (tl.label_id === updated.id) {
+              tl.label_name = updated.name;
+              tl.label_color = updated.color;
+            }
+          });
+        });
+        renderBoard();
+      }
       populateLabelFilter();
+      closeInlineLabelEditor();
+      renderLabelPickerList();
       showToast(`Đã cập nhật nhãn "${updated.name}"`);
-      await loadBoard();
-    } catch (error) {
-      showToast(error.message, "error");
+    } else {
+      const created = await api.post(`/projects/${projectId}/labels`, { name, color });
+      projectLabels.push(created);
+      pickedLabelIds.add(Number(created.id));
+      populateLabelFilter();
+      closeInlineLabelEditor();
+      renderLabelPickerList();
+      showToast(`Đã tạo và chọn nhãn "${created.name}"`);
     }
+  } catch (error) {
+    setFieldError(nameInput, error.message);
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+});
+
+document.getElementById("task-labels-list")?.addEventListener("click", async (event) => {
+  const pickBtn = event.target.closest("[data-pick-label]");
+  if (pickBtn) {
+    if (pickBtn.disabled || !canEdit) return;
+    const lid = Number(pickBtn.dataset.pickLabel);
+    if (pickedLabelIds.has(lid)) pickedLabelIds.delete(lid);
+    else pickedLabelIds.add(lid);
+    renderLabelPickerList();
     return;
   }
-  if (deleteBtn) {
-    const label = projectLabels.find((lb) => lb.id === Number(deleteBtn.dataset.deleteLabel));
+
+  const editBtn = event.target.closest("[data-inline-edit-label]");
+  if (editBtn && canManageLists) {
+    const label = projectLabels.find((lb) => lb.id === Number(editBtn.dataset.inlineEditLabel));
+    if (label) openInlineLabelEditor(label);
+    return;
+  }
+
+  const deleteBtn = event.target.closest("[data-inline-delete-label]");
+  if (deleteBtn && canManageLists) {
+    const lid = Number(deleteBtn.dataset.inlineDeleteLabel);
+    const label = projectLabels.find((lb) => lb.id === lid);
     if (!label) return;
     const ok = await showConfirmModal({
       eyebrow: "QUẢN LÝ NHÃN",
       title: `Xoá nhãn "${label.name}"?`,
-      message: "Nhãn sẽ bị gỡ khỏi tất cả công việc đang gắn và không thể hoàn tác.",
+      message: "Nhãn sẽ bị gỡ khỏi tất cả công việc trong dự án và không thể hoàn tác.",
       confirmText: "Xoá nhãn",
       danger: true,
     });
     if (!ok) return;
     try {
-      await api.delete(`/projects/${projectId}/labels/${label.id}`);
-      projectLabels = projectLabels.filter((lb) => lb.id !== label.id);
-      if (labelFilter && labelFilter.value === String(label.id)) labelFilter.value = "";
-      renderLabelsManager();
+      await api.delete(`/projects/${projectId}/labels/${lid}`);
+      projectLabels = projectLabels.filter((lb) => lb.id !== lid);
+      pickedLabelIds.delete(lid);
+      if (editingInlineLabelId === lid) closeInlineLabelEditor();
+      if (currentTask) {
+        currentTask.labels = (currentTask.labels || []).filter((tl) => tl.label_id !== lid);
+      }
+      if (labelFilter && labelFilter.value === String(lid)) labelFilter.value = "";
+      if (boardData?.tasks) {
+        boardData.tasks.forEach((t) => {
+          t.labels = (t.labels || []).filter((tl) => tl.label_id !== lid);
+        });
+        renderBoard();
+      }
       populateLabelFilter();
+      renderLabelPickerList();
       showToast(`Đã xoá nhãn "${label.name}"`);
-      await loadBoard();
     } catch (error) {
       showToast(error.message, "error");
     }

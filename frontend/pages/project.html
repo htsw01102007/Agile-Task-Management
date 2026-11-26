@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="icon" href="../assets/images/logo.svg">
-  <link rel="stylesheet" href="../css/style.css?v=20261127">
+      <link rel="stylesheet" href="../css/style.css?v=20261127b">
 </head>
 
 <body data-root="../">
@@ -124,7 +124,6 @@
             <option value="">Mọi nhãn</option>
           </select>
 
-          <button id="labels-manage-button" class="filter-btn" type="button" hidden><span data-icon="tag"></span><span>Quản lý nhãn</span></button>
           <button id="trash-button" class="filter-btn" type="button" hidden><span data-icon="trash"></span><span>Thùng rác</span></button>
           <button id="retry-board" class="filter-btn" type="button" hidden><span data-icon="refresh"></span><span>Thử lại</span></button>
         </div>
@@ -347,14 +346,51 @@
               <label for="task-due-date">Hạn chót hoàn thành</label>
               <input id="task-due-date" name="due_date" type="datetime-local">
 
-              <label for="task-assignees">Người thực hiện (Giữ Ctrl để chọn nhiều)</label>
-              <select id="task-assignees" name="assignee_ids" multiple size="4"></select>
-
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;margin-bottom:5px;">
-                <label for="task-labels" style="margin:0;">Nhãn phân loại</label>
-                <button id="create-label-btn" class="btn btn-small" type="button" hidden>＋ Tạo nhãn</button>
+              <!-- Người thực hiện: Click để chọn / bỏ chọn -->
+              <div class="picker-section">
+                <div class="picker-header">
+                  <label style="margin:0;">Người thực hiện</label>
+                  <span id="assignee-picked-count" class="picker-count">0 đã chọn</span>
+                </div>
+                <div id="task-assignees-list" class="picker-list" role="group" aria-label="Chọn người thực hiện"></div>
               </div>
-              <select id="task-labels" name="label_ids" multiple size="3"></select>
+
+              <!-- Nhãn phân loại + Tích hợp Quản lý nhãn ngay bên trong -->
+              <div class="picker-section">
+                <div class="picker-header">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <label style="margin:0;">Nhãn phân loại</label>
+                    <span id="label-picked-count" class="picker-count">0 đã chọn</span>
+                  </div>
+                  <button id="toggle-inline-label-btn" class="btn btn-small" type="button" hidden>＋ Tạo nhãn</button>
+                </div>
+
+                <!-- Khung tạo / sửa nhãn trực tiếp trong mục Nhãn phân loại -->
+                <div id="inline-label-editor" class="inline-label-editor" hidden>
+                  <div class="inline-label-editor-top">
+                    <strong id="inline-label-editor-title">Tạo nhãn mới</strong>
+                  </div>
+                  <input id="inline-label-name" type="text" maxlength="50" placeholder="Nhập tên nhãn (VD: Backend, UI/UX)…">
+                  <div class="inline-label-colors">
+                    <div id="inline-label-swatches" class="inline-swatches">
+                      <button type="button" class="color-swatch" data-swatch="#5E6AD2" style="background:#5E6AD2;" aria-label="Tím Indigo"></button>
+                      <button type="button" class="color-swatch" data-swatch="#2563EB" style="background:#2563EB;" aria-label="Xanh dương"></button>
+                      <button type="button" class="color-swatch" data-swatch="#059669" style="background:#059669;" aria-label="Xanh ngọc"></button>
+                      <button type="button" class="color-swatch" data-swatch="#D97706" style="background:#D97706;" aria-label="Cam hổ phách"></button>
+                      <button type="button" class="color-swatch" data-swatch="#DC2626" style="background:#DC2626;" aria-label="Đỏ"></button>
+                      <button type="button" class="color-swatch" data-swatch="#7C3AED" style="background:#7C3AED;" aria-label="Tím đậm"></button>
+                      <button type="button" class="color-swatch" data-swatch="#EC4899" style="background:#EC4899;" aria-label="Hồng"></button>
+                    </div>
+                    <input id="inline-label-color" type="color" value="#5E6AD2" title="Chọn mã màu tuỳ chỉnh">
+                  </div>
+                  <div class="inline-label-actions">
+                    <button id="inline-label-cancel" class="btn btn-small" type="button">Huỷ</button>
+                    <button id="inline-label-save" class="btn btn-small btn-primary" type="button">Lưu nhãn</button>
+                  </div>
+                </div>
+
+                <div id="task-labels-list" class="picker-list" role="group" aria-label="Chọn và quản lý nhãn phân loại"></div>
+              </div>
 
               <p id="task-completed-at" class="muted task-readonly"></p>
               <p id="task-created-by" class="muted task-readonly"></p>
@@ -451,7 +487,7 @@
   <script src="../js/api.js?v=20261127"></script>
   <script src="../js/utils.js?v=20261127"></script>
   <script src="../js/layout.js?v=20261127"></script>
-  <script src="../js/pages/project.js?v=20261127"></script>
+  <script src="../js/pages/project.js?v=20261127b"></script>
 </body>
 
 </html>
