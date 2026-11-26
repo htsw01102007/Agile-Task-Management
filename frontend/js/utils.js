@@ -41,6 +41,8 @@ const MINIMAL_ICONS = {
   chevronUp: '<svg class="icon" viewBox="0 0 24 24"><polyline points="17 14 12 9 7 14"/></svg>',
   grip: '<svg class="icon" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.35" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.35" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.35" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.35" fill="currentColor" stroke="none"/></svg>',
   sparkle: '<svg class="icon" viewBox="0 0 24 24"><path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2L12 3z"/></svg>',
+  sun: '<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M5.28 5.28l1.56 1.56M17.16 17.16l1.56 1.56M2.5 12h2.2M19.3 12h2.2M5.28 18.72l1.56-1.56M17.16 6.84l1.56-1.56"/></svg>',
+  moon: '<svg class="icon" viewBox="0 0 24 24"><path d="M20.5 14.2A8 8 0 0 1 9.8 3.5a8 8 0 1 0 10.7 10.7z"/></svg>',
 };
 
 function iconSvg(name) {
@@ -60,6 +62,72 @@ function hydrateIcons(root = document) {
     }
   });
 }
+
+// ==========================================================================
+// Hệ thống Giao diện Sáng / Tối (Lần đầu tự nhận diện theo System OS)
+// ==========================================================================
+const THEME_STORAGE_KEY = "agile_theme";
+
+function getSystemTheme() {
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+function getEffectiveTheme() {
+  const saved = localStorage.getItem(THEME_STORAGE_KEY);
+  if (saved === "dark" || saved === "light") return saved;
+  return getSystemTheme();
+}
+
+function applyTheme(theme) {
+  const normalized = theme === "dark" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", normalized);
+  document.documentElement.style.colorScheme = normalized;
+  document.querySelectorAll("[data-theme-choice]").forEach((btn) => {
+    const active = btn.dataset.themeChoice === normalized;
+    btn.classList.toggle("is-active", active);
+    btn.setAttribute("aria-pressed", String(active));
+  });
+  const iconHolder = document.querySelector(".theme-current-icon");
+  if (iconHolder) {
+    iconHolder.innerHTML = iconSvg(normalized === "dark" ? "moon" : "sun");
+  }
+}
+
+function setUserTheme(theme) {
+  const normalized = theme === "dark" ? "dark" : "light";
+  localStorage.setItem(THEME_STORAGE_KEY, normalized);
+  applyTheme(normalized);
+}
+
+function toggleTheme() {
+  const next = getEffectiveTheme() === "dark" ? "light" : "dark";
+  setUserTheme(next);
+  return next;
+}
+
+(function initThemeSystem() {
+  applyTheme(getEffectiveTheme());
+  if (window.matchMedia) {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemChange = (e) => {
+      if (!localStorage.getItem(THEME_STORAGE_KEY)) {
+        applyTheme(e.matches ? "dark" : "light");
+      }
+    };
+    if (typeof mq.addEventListener === "function") {
+      mq.addEventListener("change", handleSystemChange);
+    } else if (typeof mq.addListener === "function") {
+      mq.addListener(handleSystemChange);
+    }
+  }
+  window.addEventListener("storage", (e) => {
+    if (e.key === THEME_STORAGE_KEY) {
+      applyTheme(getEffectiveTheme());
+    }
+  });
+})();
 
 // Chống XSS: luôn dùng hàm này khi chèn dữ liệu người dùng nhập vào innerHTML
 function escapeHtml(value) {

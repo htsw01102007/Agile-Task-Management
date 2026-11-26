@@ -208,10 +208,44 @@ function renderLayout(projects = [], user = FALLBACK_USER, projectsMessage = "Ch
   const isAuthenticated = Boolean(localStorage.getItem("access_token") || localStorage.getItem("token"));
   const isLoginPage = path.endsWith("login.html");
   const authAction = isAuthenticated
-    ? `<button class="header-auth" type="button" id="logout-button" title="Đăng xuất khỏi phiên làm việc">${iconSvg("logout")}<span>Đăng xuất</span></button>`
+    ? ""
     : isLoginPage
       ? `<a class="header-auth" href="${root}index.html">Trang chủ</a>`
       : `<a class="header-auth" href="${root}pages/login.html">Đăng nhập</a>`;
+  const currentTheme = typeof getEffectiveTheme === "function" ? getEffectiveTheme() : "light";
+  const userMenuMarkup = `
+    <div class="user-menu-wrap">
+      <button class="avatar-trigger" type="button" id="avatar-menu-btn" aria-haspopup="menu" aria-expanded="false" title="Tài khoản &amp; Giao diện">
+        ${userAvatarMarkup(user, "avatar")}
+      </button>
+      <div id="user-menu-dropdown" class="user-menu-dropdown" role="menu" hidden>
+        <div class="user-menu-head">
+          ${userAvatarMarkup(user, "avatar avatar-small")}
+          <div class="user-menu-identity">
+            <strong>${escapeHtml(user.full_name || "Tài khoản")}</strong>
+            <small>${escapeHtml(user.email || (isAuthenticated ? "Thành viên chính thức" : "Chế độ khách"))}</small>
+          </div>
+        </div>
+        <div class="user-menu-divider"></div>
+        ${isAuthenticated
+          ? `<a class="user-menu-item" role="menuitem" href="${root}pages/profile.html">${iconSvg("user")}<span>Hồ sơ</span></a>`
+          : `<a class="user-menu-item" role="menuitem" href="${root}pages/login.html">${iconSvg("user")}<span>Đăng nhập</span></a>`}
+        <div class="user-menu-theme-row" role="group" aria-label="Chế độ giao diện Light / Dark">
+          <span class="user-menu-theme-label">
+            <span class="theme-current-icon">${iconSvg(currentTheme === "dark" ? "moon" : "sun")}</span>
+            <span>Theme</span>
+          </span>
+          <div class="theme-switch-pills">
+            <button type="button" class="theme-pill${currentTheme === "light" ? " is-active" : ""}" data-theme-choice="light" aria-pressed="${currentTheme === "light"}">${iconSvg("sun")}<span>Light</span></button>
+            <button type="button" class="theme-pill${currentTheme === "dark" ? " is-active" : ""}" data-theme-choice="dark" aria-pressed="${currentTheme === "dark"}">${iconSvg("moon")}<span>Dark</span></button>
+          </div>
+        </div>
+        ${isAuthenticated ? `
+          <div class="user-menu-divider"></div>
+          <button class="user-menu-item user-menu-danger" role="menuitem" type="button" id="logout-button">${iconSvg("logout")}<span>Đăng xuất</span></button>
+        ` : ""}
+      </div>
+    </div>`;
   const projectId = new URLSearchParams(window.location.search).get("project");
   const isBoard = path.endsWith("project.html");
   const projectLinks = projects.map((project) => `
@@ -262,7 +296,7 @@ function renderLayout(projects = [], user = FALLBACK_USER, projectsMessage = "Ch
     <div class="header-right">
       ${notifMarkup}
       ${authAction}
-      ${userAvatarMarkup(user, "avatar")}
+      ${userMenuMarkup}
     </div>`;
 
   document.getElementById("app-sidebar").innerHTML = `
@@ -351,11 +385,36 @@ function renderLayout(projects = [], user = FALLBACK_USER, projectsMessage = "Ch
     window.location.href = `${root}index.html`;
   });
 
+  const avatarBtn = document.getElementById("avatar-menu-btn");
+  const userDropdown = document.getElementById("user-menu-dropdown");
   const bellBtn = document.getElementById("notif-bell-btn");
   const dropdown = document.getElementById("notif-dropdown");
+
+  if (avatarBtn && userDropdown) {
+    avatarBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const willOpen = userDropdown.hidden;
+      if (dropdown && !dropdown.hidden) dropdown.hidden = true;
+      userDropdown.hidden = !willOpen;
+      avatarBtn.setAttribute("aria-expanded", String(willOpen));
+    });
+    userDropdown.querySelectorAll("[data-theme-choice]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (typeof setUserTheme === "function") {
+          setUserTheme(btn.dataset.themeChoice);
+        }
+      });
+    });
+  }
+
   if (bellBtn && dropdown) {
     bellBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
+      if (userDropdown && !userDropdown.hidden) {
+        userDropdown.hidden = true;
+        avatarBtn?.setAttribute("aria-expanded", "false");
+      }
       dropdown.hidden = !dropdown.hidden;
       if (!dropdown.hidden) await refreshNotifications(root);
     });
@@ -376,6 +435,11 @@ document.addEventListener("click", (e) => {
   if (notifDropdown && !notifDropdown.hidden && !e.target.closest(".notif-wrap")) {
     notifDropdown.hidden = true;
   }
+  const userDropdown = document.getElementById("user-menu-dropdown");
+  if (userDropdown && !userDropdown.hidden && !e.target.closest(".user-menu-wrap")) {
+    userDropdown.hidden = true;
+    document.getElementById("avatar-menu-btn")?.setAttribute("aria-expanded", "false");
+  }
   const searchDropdown = document.getElementById("global-search-dropdown");
   if (searchDropdown && !searchDropdown.hidden && !e.target.closest("#global-search-box")) {
     searchDropdown.hidden = true;
@@ -383,6 +447,17 @@ document.addEventListener("click", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const userDropdown = document.getElementById("user-menu-dropdown");
+    if (userDropdown && !userDropdown.hidden) {
+      userDropdown.hidden = true;
+      document.getElementById("avatar-menu-btn")?.setAttribute("aria-expanded", "false");
+    }
+    const notifDropdown = document.getElementById("notif-dropdown");
+    if (notifDropdown && !notifDropdown.hidden) {
+      notifDropdown.hidden = true;
+    }
+  }
   if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) {
     const searchEl = document.getElementById("global-search-input");
     if (searchEl) {
