@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="icon" href="../assets/images/logo.svg">
-  <link rel="stylesheet" href="../css/style.css?v=20261123">
+  <link rel="stylesheet" href="../css/style.css?v=20261126">
 </head>
 
 <body data-root="../">
@@ -119,6 +119,12 @@
             <option value="">Mọi thành viên</option>
           </select>
 
+          <label class="sr-only" for="label-filter">Lọc theo nhãn</label>
+          <select id="label-filter" class="filter-select">
+            <option value="">Mọi nhãn</option>
+          </select>
+
+          <button id="labels-manage-button" class="filter-btn" type="button" hidden><span data-icon="tag"></span><span>Quản lý nhãn</span></button>
           <button id="trash-button" class="filter-btn" type="button" hidden><span data-icon="trash"></span><span>Thùng rác</span></button>
           <button id="retry-board" class="filter-btn" type="button" hidden><span data-icon="refresh"></span><span>Thử lại</span></button>
         </div>
@@ -200,13 +206,45 @@
 
       <!-- Chế độ 4: Bảng nhật ký hoạt động -->
       <section id="activity-panel" class="content-panel activity-panel" hidden>
-        <div class="panel-heading">
+        <div class="panel-heading activity-panel-heading">
           <div>
             <h2>Nhật ký hoạt động dự án</h2>
             <p class="muted">Lịch sử cập nhật, di chuyển thẻ và trao đổi của các thành viên theo thời gian thực.</p>
           </div>
+          <div class="activity-filters" aria-label="Bộ lọc nhật ký hoạt động">
+            <label class="sr-only" for="activity-user-filter">Lọc theo thành viên</label>
+            <select id="activity-user-filter" class="filter-select">
+              <option value="">Mọi thành viên</option>
+            </select>
+            <label class="sr-only" for="activity-action-filter">Lọc theo loại hành động</label>
+            <select id="activity-action-filter" class="filter-select">
+              <option value="">Mọi hành động</option>
+              <option value="created">Tạo mới</option>
+              <option value="updated">Cập nhật</option>
+              <option value="moved">Di chuyển</option>
+              <option value="deleted">Xoá</option>
+              <option value="restored">Khôi phục</option>
+              <option value="assigned">Giao việc</option>
+              <option value="unassigned">Bỏ giao việc</option>
+            </select>
+            <label class="sr-only" for="activity-entity-filter">Lọc theo đối tượng</label>
+            <select id="activity-entity-filter" class="filter-select">
+              <option value="">Mọi đối tượng</option>
+              <option value="task">Công việc</option>
+              <option value="comment">Bình luận</option>
+              <option value="attachment">Tệp đính kèm</option>
+              <option value="assignee">Phân công</option>
+            </select>
+          </div>
         </div>
         <div id="activity-list"></div>
+        <div id="activity-pagination" class="activity-pagination" hidden>
+          <span id="activity-page-info" class="muted"></span>
+          <div class="activity-page-buttons">
+            <button id="activity-prev-page" class="btn btn-small" type="button">← Trang trước</button>
+            <button id="activity-next-page" class="btn btn-small" type="button">Trang sau →</button>
+          </div>
+        </div>
       </section>
 
       <!-- Hộp thoại Chi tiết / Tạo công việc -->
@@ -231,11 +269,22 @@
               <label for="task-list">Cột trạng thái Kanban</label>
               <select id="task-list" name="list_id"></select>
 
+              <!-- Thanh chuyển tab Chi tiết / Hoạt động của task -->
+              <div id="task-modal-tabs" class="task-modal-tabs" role="tablist" hidden>
+                <button type="button" class="task-modal-tab active" data-task-modal-tab="details" role="tab" aria-selected="true">Chi tiết &amp; Thảo luận</button>
+                <button type="button" class="task-modal-tab" data-task-modal-tab="activity" role="tab" aria-selected="false">Hoạt động</button>
+              </div>
+
               <!-- Checklist -->
               <section id="checklist-panel" class="task-subpanel" hidden>
                 <div class="subpanel-heading">
                   <h3>Danh sách kiểm tra (Checklist)</h3>
                   <span id="checklist-progress" class="role-badge"></span>
+                </div>
+                <div class="checklist-progress-bar">
+                  <div class="health-track">
+                    <div id="checklist-progress-fill" class="health-fill" style="width: 0%;"></div>
+                  </div>
                 </div>
                 <div id="checklist-items"></div>
                 <div id="checklist-form" class="inline-form">
@@ -267,6 +316,14 @@
                   ＋ Tải tệp đính kèm lên
                   <input id="attachment-upload" type="file" hidden>
                 </label>
+              </section>
+
+              <!-- Tab Hoạt động riêng của task -->
+              <section id="task-activity-panel" class="task-subpanel" hidden>
+                <div class="subpanel-heading">
+                  <h3>Lịch sử hoạt động công việc</h3>
+                </div>
+                <div id="task-activity-list"></div>
               </section>
             </section>
 
@@ -348,6 +405,25 @@
         </div>
       </dialog>
 
+      <!-- Hộp thoại Quản lý nhãn dự án -->
+      <dialog id="labels-dialog" class="app-dialog app-dialog-compact">
+        <div class="dialog-form">
+          <div class="dialog-heading">
+            <div>
+              <p class="eyebrow">PHÂN LOẠI CÔNG VIỆC</p>
+              <h2>Quản lý nhãn dự án</h2>
+            </div>
+            <button class="icon-btn" type="button" data-close-labels aria-label="Đóng" data-icon="close"></button>
+          </div>
+          <div id="project-labels-list"></div>
+          <div class="dialog-actions">
+            <button id="add-label-from-manager" class="btn btn-primary" type="button"><span data-icon="plus"></span><span>Tạo nhãn mới</span></button>
+            <span class="grow"></span>
+            <button class="btn" type="button" data-close-labels>Đóng</button>
+          </div>
+        </div>
+      </dialog>
+
       <!-- Hộp thoại Thùng rác -->
       <dialog id="trash-dialog" class="app-dialog">
         <div class="dialog-form">
@@ -367,11 +443,11 @@
   <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
-  <script src="../js/config.js?v=20261123"></script>
-  <script src="../js/api.js?v=20261123"></script>
-  <script src="../js/utils.js?v=20261123"></script>
-  <script src="../js/layout.js?v=20261123"></script>
-  <script src="../js/pages/project.js?v=20261123"></script>
+  <script src="../js/config.js?v=20261126"></script>
+  <script src="../js/api.js?v=20261126"></script>
+  <script src="../js/utils.js?v=20261126"></script>
+  <script src="../js/layout.js?v=20261126"></script>
+  <script src="../js/pages/project.js?v=20261126"></script>
 </body>
 
 </html>

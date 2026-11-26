@@ -523,8 +523,11 @@ function showConfirmModal({
   });
 }
 
-function showLabelModal() {
+function showLabelModal(existingLabel = null) {
   const presets = ["#5E6AD2", "#10B981", "#F59E0B", "#EF4444", "#0EA5E9", "#8B5CF6", "#EC4899", "#64748B"];
+  const isEdit = Boolean(existingLabel && existingLabel.id);
+  const initialName = existingLabel?.name || "";
+  const initialColor = (existingLabel?.color || presets[0]).toUpperCase();
   return new Promise((resolve) => {
     const dialog = document.createElement("dialog");
     dialog.className = "app-dialog app-dialog-compact";
@@ -533,25 +536,25 @@ function showLabelModal() {
         <div class="dialog-heading">
           <div>
             <p class="eyebrow">PHÂN LOẠI CÔNG VIỆC</p>
-            <h2>Tạo nhãn màu mới</h2>
+            <h2>${isEdit ? "Chỉnh sửa nhãn màu" : "Tạo nhãn màu mới"}</h2>
           </div>
           <button class="icon-btn" type="button" data-modal-cancel aria-label="Đóng">${iconSvg("close")}</button>
         </div>
 
         <label for="custom-label-name">Tên nhãn hiển thị *</label>
-        <input id="custom-label-name" name="name" type="text" maxlength="50" placeholder="VD: Backend, UI/UX, Khẩn cấp…" required>
+        <input id="custom-label-name" name="name" type="text" maxlength="50" value="${escapeHtml(initialName)}" placeholder="VD: Backend, UI/UX, Khẩn cấp…" required>
 
         <label style="margin-top: 14px;">Chọn màu sắc nhận diện</label>
         <div class="color-picker-row">
           <div class="color-swatches">
-            ${presets.map((hex, i) => `<button type="button" class="color-swatch ${i === 0 ? "active" : ""}" data-color="${hex}" style="background:${hex};" aria-label="Màu ${hex}"></button>`).join("")}
+            ${presets.map((hex) => `<button type="button" class="color-swatch ${hex.toUpperCase() === initialColor ? "active" : ""}" data-color="${hex}" style="background:${hex};" aria-label="Màu ${hex}"></button>`).join("")}
           </div>
-          <input id="custom-label-color" class="color-input-native" type="color" value="${presets[0]}" title="Tùy chọn màu bất kỳ">
+          <input id="custom-label-color" class="color-input-native" type="color" value="${escapeHtml(initialColor)}" title="Tùy chọn màu bất kỳ">
         </div>
 
         <div class="dialog-actions">
           <button class="btn" type="button" data-modal-cancel>Huỷ</button>
-          <button class="btn btn-primary" type="submit">${iconSvg("plus")}<span>Tạo nhãn</span></button>
+          <button class="btn btn-primary" type="submit">${iconSvg(isEdit ? "check" : "plus")}<span>${isEdit ? "Lưu nhãn" : "Tạo nhãn"}</span></button>
         </div>
       </form>
     `;
