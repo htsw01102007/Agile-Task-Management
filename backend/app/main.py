@@ -29,6 +29,16 @@ def _ensure_schema_migrations() -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0"))
 
+    if inspector.has_table("checklist_items"):
+        checklist_columns = {col["name"] for col in inspector.get_columns("checklist_items")}
+        if "updated_at" not in checklist_columns:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE checklist_items "
+                    "ADD COLUMN updated_at DATETIME NOT NULL "
+                    "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+                ))
+
     if inspector.has_table("project_invitations"):
         inv_columns = {col["name"] for col in inspector.get_columns("project_invitations")}
         if "pending_email" not in inv_columns:
@@ -101,6 +111,7 @@ app.add_middleware(
     allow_credentials=settings.cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Total-Count", "X-Page", "X-Size", "X-Total-Pages"],
 )
 
 # Đăng ký các router với prefix /api

@@ -78,6 +78,25 @@ def upgrade() -> None:
             op.add_column("tasks", sa.Column("deleted_at", sa.DateTime(), nullable=True))
         op.execute("ALTER TABLE tasks MODIFY title VARCHAR(500) NOT NULL")
 
+    # -------------------------------------------------------- checklist_items
+    if _has_table("checklist_items"):
+        cols = _columns("checklist_items")
+        if "updated_at" not in cols:
+            op.add_column(
+                "checklist_items",
+                sa.Column(
+                    "updated_at",
+                    sa.DateTime(),
+                    nullable=False,
+                    server_default=sa.text("CURRENT_TIMESTAMP"),
+                ),
+            )
+            op.execute(
+                "ALTER TABLE checklist_items "
+                "MODIFY updated_at DATETIME NOT NULL "
+                "DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+            )
+
     # ---------------------------------------------------------- notifications
     if _has_table("notifications"):
         cols = _columns("notifications")

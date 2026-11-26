@@ -187,6 +187,7 @@ CREATE TABLE checklist_items (
     position        INT UNSIGNED NOT NULL DEFAULT 0,
     completed_at    DATETIME NULL,
     created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_ci_task FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE,
     INDEX idx_ci_task_position (task_id, position)
 ) ENGINE=InnoDB;

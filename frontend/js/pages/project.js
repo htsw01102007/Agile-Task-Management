@@ -8,10 +8,16 @@ const teamButton = document.getElementById("team-button");
 const searchInput = document.getElementById("task-search");
 const priorityFilter = document.getElementById("priority-filter");
 const assigneeFilter = document.getElementById("assignee-filter");
+const labelFilter = document.getElementById("label-filter");
+const labelsManageButton = document.getElementById("labels-manage-button");
 const taskDialog = document.getElementById("task-dialog");
 const taskForm = document.getElementById("task-form");
 const teamDialog = document.getElementById("team-dialog");
+const labelsDialog = document.getElementById("labels-dialog");
 const trashDialog = document.getElementById("trash-dialog");
+const activityUserFilter = document.getElementById("activity-user-filter");
+const activityActionFilter = document.getElementById("activity-action-filter");
+const activityEntityFilter = document.getElementById("activity-entity-filter");
 const priorityNames = { low: "Thấp", medium: "Trung bình", high: "Cao", urgent: "Khẩn cấp" };
 
 const requestedProjectId = new URLSearchParams(window.location.search).get("project");
@@ -22,6 +28,12 @@ let currentUser = null;
 let members = [];
 let projectLabels = [];
 let currentTask = null;
+let currentChecklistItems = [];
+let currentComments = [];
+let currentTaskModalTab = "details";
+let activityPage = 1;
+let activityTotalPages = 1;
+const ACTIVITY_PAGE_SIZE = 20;
 let savingTask = false;
 let canEdit = false;
 let canManageLists = false;
@@ -84,6 +96,8 @@ function assigneeMarkup(assignees = []) {
   return `<span class="task-assignees" aria-label="Người thực hiện">${shown}${remainder}</span>`;
 }
 
+const COMMENT_ICON_SVG = '<svg class="icon" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+
 function taskMarkup(task) {
   const completed = isTaskDone(task);
   const due = formatDueDate(task.due_date, completed);
@@ -92,6 +106,20 @@ function taskMarkup(task) {
     <span class="task-label-chip" style="background:${escapeHtml(lb.label_color || "#64748b")}22;color:${escapeHtml(lb.label_color || "#64748b")};border:1px solid ${escapeHtml(lb.label_color || "#64748b")}55;">
       ${escapeHtml(lb.label_name)}
     </span>`).join("");
+  const checklistTotal = Number(task.checklist_total || 0);
+  const checklistDone = Number(task.checklist_completed || 0);
+  const commentsCount = Number(task.comments_count || 0);
+  const attachmentsCount = Number(task.attachments_count || 0);
+  const badges = [];
+  if (checklistTotal > 0) {
+    badges.push(`<span class="task-card-badge${checklistDone === checklistTotal ? " is-complete" : ""}" title="Checklist hoàn thành">${iconSvg("check")}<span>${checklistDone}/${checklistTotal}</span></span>`);
+  }
+  if (commentsCount > 0) {
+    badges.push(`<span class="task-card-badge" title="Số bình luận">${COMMENT_ICON_SVG}<span>${commentsCount}</span></span>`);
+  }
+  if (attachmentsCount > 0) {
+    badges.push(`<span class="task-card-badge" title="Tệp đính kèm">${iconSvg("paperclip")}<span>${attachmentsCount}</span></span>`);
+  }
   return `<article class="task-card${completed ? " completed-task" : ""}" tabindex="0" draggable="${canEdit}" data-task-id="${task.id}">
     <div class="task-card-header">
       <span class="task-id-badge">#${task.id}</span>
@@ -100,11 +128,19 @@ function taskMarkup(task) {
     ${labelChips ? `<div class="task-labels-row">${labelChips}</div>` : ""}
     <h3>${escapeHtml(task.title)}</h3>
     ${task.description ? `<p class="task-desc-preview">${escapeHtml(task.description)}</p>` : ""}
+    ${badges.length ? `<div class="task-card-badges">${badges.join("")}</div>` : ""}
     <div class="task-footer">
       <span class="task-date${due.overdue ? " overdue" : ""}">${due.text}</span>
       ${assigneeMarkup(task.assignees)}
     </div>
   </article>`;
+}
+
+function populateLabelFilter() {
+  if (!labelFilter) return;
+  const current = labelFilter.value;
+  labelFilter.innerHTML = `<option value="">Mọi nhãn</option>`
+    + (projectLabels || []).map((lb) => `<option value="${lb.id}" ${String(lb.id) === current ? "selected" : ""}>${escapeHtml(lb.name)}</option>`).join("");
 }
 
 function populateAssigneeFilter() {
@@ -139,6 +175,7 @@ function getFilteredTasks() {
   const query = searchInput.value.trim().toLocaleLowerCase("vi");
   const selectedPriority = priorityFilter.value;
   const selectedAssignee = assigneeFilter?.value || "";
+  const selectedLabel = labelFilter?.value || "";
   return boardData.tasks.filter((task) => {
     const matchQuery = !query
       || task.title.toLocaleLowerCase("vi").includes(query)
@@ -150,7 +187,8 @@ function getFilteredTasks() {
     } else if (selectedAssignee) {
       matchAssignee = (task.assignees || []).some((a) => String(a.user_id) === selectedAssignee);
     }
-    return matchQuery && matchPriority && matchAssignee;
+    const matchLabel = !selectedLabel || (task.labels || []).some((lb) => String(lb.label_id) === selectedLabel);
+    return matchQuery && matchPriority && matchAssignee && matchLabel;
   });
 }
 
@@ -190,6 +228,7 @@ function renderBoard() {
   });
 
   populateAssigneeFilter();
+  populateLabelFilter();
   const visibleTasks = getFilteredTasks();
   const columns = [...boardData.lists].sort((a, b) => a.position - b.position || a.id - b.id);
   boardElement.innerHTML = columns.map((list) => {
@@ -419,6 +458,7 @@ function renderProject() {
   document.getElementById("readonly-banner").hidden = active;
   newTaskButton.hidden = !canEdit;
   teamButton.hidden = !["owner", "manager"].includes(projectData.user_role);
+  if (labelsManageButton) labelsManageButton.hidden = !canManageLists;
   document.getElementById("trash-button").hidden = !active || !["owner", "manager"].includes(projectData.user_role);
 }
 
@@ -447,16 +487,18 @@ async function loadBoard({ showSkeleton = false } = {}) {
   }
   try {
     const id = await resolveProjectId();
-    const [project, board, user, memberList] = await Promise.all([
+    const [project, board, user, memberList, labelList] = await Promise.all([
       api.get(`/projects/${id}`),
       api.get(`/projects/${id}/board`),
       currentUser ? Promise.resolve(currentUser) : api.get("/auth/me"),
       api.get(`/projects/${id}/members`).catch(() => members),
+      api.get(`/projects/${id}/labels`).catch(() => projectLabels),
     ]);
     projectData = project;
     boardData = board;
     currentUser = user;
     if (Array.isArray(memberList)) members = memberList;
+    if (Array.isArray(labelList)) projectLabels = labelList;
     renderProject();
     renderBoard();
     connectProjectWebSocket(id);
@@ -544,7 +586,9 @@ function openTaskForm(listId, task = null) {
   populateTaskLists(task?.list_id || listId || boardData.lists[0]?.id);
   populateAssignees((task?.assignees || []).map((assignee) => assignee.user_id));
   populateLabels((task?.labels || []).map((lb) => lb.label_id));
-  ["checklist-panel", "comments-panel", "attachments-panel"].forEach((id) => { document.getElementById(id).hidden = !task; });
+  const taskModalTabs = document.getElementById("task-modal-tabs");
+  if (taskModalTabs) taskModalTabs.hidden = !task;
+  setTaskModalTab("details", Boolean(task));
   setTaskFormReadOnly(!canEdit);
   taskDialog.showModal();
   if (task) {
@@ -608,9 +652,108 @@ document.getElementById("create-label-btn")?.addEventListener("click", async () 
     const currentSelected = selectedLabelIds();
     currentSelected.push(created.id);
     populateLabels(currentSelected);
+    populateLabelFilter();
     showToast(`Đã tạo nhãn "${created.name}"`);
   } catch (error) {
     showToast(error.message, "error");
+  }
+});
+
+function renderLabelsManager() {
+  const container = document.getElementById("project-labels-list");
+  if (!container) return;
+  if (!projectLabels.length) {
+    container.innerHTML = '<p class="empty-state">Dự án chưa có nhãn phân loại nào.</p>';
+    return;
+  }
+  container.innerHTML = projectLabels.map((lb) => `
+    <div class="label-manager-row">
+      <span class="label-color-dot" style="background:${escapeHtml(lb.color || "#808080")};"></span>
+      <span class="label-manager-info">
+        <span class="task-label-chip" style="background:${escapeHtml(lb.color || "#64748b")}22;color:${escapeHtml(lb.color || "#64748b")};border:1px solid ${escapeHtml(lb.color || "#64748b")}55;">${escapeHtml(lb.name)}</span>
+        <code>${escapeHtml(lb.color || "#808080")}</code>
+      </span>
+      <span class="label-manager-actions">
+        <button class="btn btn-small" type="button" data-edit-label="${lb.id}">Sửa</button>
+        <button class="btn btn-small btn-danger" type="button" data-delete-label="${lb.id}">Xoá</button>
+      </span>
+    </div>`).join("");
+}
+
+async function openLabelsDialog() {
+  if (!labelsDialog) return;
+  if (!labelsDialog.open) labelsDialog.showModal();
+  const container = document.getElementById("project-labels-list");
+  if (container) container.innerHTML = '<p class="muted">Đang tải danh sách nhãn…</p>';
+  try {
+    projectLabels = await api.get(`/projects/${projectId}/labels`);
+    renderLabelsManager();
+    populateLabelFilter();
+  } catch (error) {
+    if (container) container.innerHTML = `<p class="status status-error">${escapeHtml(error.message)}</p>`;
+  }
+}
+
+labelsManageButton?.addEventListener("click", openLabelsDialog);
+document.querySelectorAll("[data-close-labels]").forEach((btn) => btn.addEventListener("click", () => labelsDialog?.close()));
+labelsDialog?.addEventListener("click", (event) => {
+  if (event.target === labelsDialog) labelsDialog.close();
+});
+document.getElementById("add-label-from-manager")?.addEventListener("click", async () => {
+  const modalResult = await showLabelModal();
+  if (!modalResult) return;
+  try {
+    const created = await api.post(`/projects/${projectId}/labels`, modalResult);
+    projectLabels.push(created);
+    renderLabelsManager();
+    populateLabelFilter();
+    showToast(`Đã tạo nhãn "${created.name}"`);
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+});
+document.getElementById("project-labels-list")?.addEventListener("click", async (event) => {
+  const editBtn = event.target.closest("[data-edit-label]");
+  const deleteBtn = event.target.closest("[data-delete-label]");
+  if (editBtn) {
+    const label = projectLabels.find((lb) => lb.id === Number(editBtn.dataset.editLabel));
+    if (!label) return;
+    const modalResult = await showLabelModal(label);
+    if (!modalResult) return;
+    try {
+      const updated = await api.put(`/projects/${projectId}/labels/${label.id}`, modalResult);
+      projectLabels = projectLabels.map((lb) => (lb.id === updated.id ? updated : lb));
+      renderLabelsManager();
+      populateLabelFilter();
+      showToast(`Đã cập nhật nhãn "${updated.name}"`);
+      await loadBoard();
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+    return;
+  }
+  if (deleteBtn) {
+    const label = projectLabels.find((lb) => lb.id === Number(deleteBtn.dataset.deleteLabel));
+    if (!label) return;
+    const ok = await showConfirmModal({
+      eyebrow: "QUẢN LÝ NHÃN",
+      title: `Xoá nhãn "${label.name}"?`,
+      message: "Nhãn sẽ bị gỡ khỏi tất cả công việc đang gắn và không thể hoàn tác.",
+      confirmText: "Xoá nhãn",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/projects/${projectId}/labels/${label.id}`);
+      projectLabels = projectLabels.filter((lb) => lb.id !== label.id);
+      if (labelFilter && labelFilter.value === String(label.id)) labelFilter.value = "";
+      renderLabelsManager();
+      populateLabelFilter();
+      showToast(`Đã xoá nhãn "${label.name}"`);
+      await loadBoard();
+    } catch (error) {
+      showToast(error.message, "error");
+    }
   }
 });
 
@@ -737,6 +880,46 @@ document.getElementById("deleted-tasks").addEventListener("click", async (event)
   }
 });
 
+function setTaskModalTab(tab, hasTask = Boolean(currentTask)) {
+  currentTaskModalTab = tab;
+  const showDetails = hasTask && tab === "details";
+  const showActivity = hasTask && tab === "activity";
+  ["checklist-panel", "comments-panel", "attachments-panel"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = !showDetails;
+  });
+  const taskActivityPanel = document.getElementById("task-activity-panel");
+  if (taskActivityPanel) taskActivityPanel.hidden = !showActivity;
+  document.querySelectorAll("[data-task-modal-tab]").forEach((btn) => {
+    const active = btn.dataset.taskModalTab === tab;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  if (showActivity && currentTask) {
+    loadTaskActivity(currentTask.id);
+  }
+}
+
+document.getElementById("task-modal-tabs")?.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-task-modal-tab]");
+  if (!btn || !currentTask) return;
+  setTaskModalTab(btn.dataset.taskModalTab, true);
+});
+
+async function loadTaskActivity(taskId) {
+  const container = document.getElementById("task-activity-list");
+  if (!container) return;
+  container.innerHTML = '<p class="muted">Đang tải lịch sử hoạt động…</p>';
+  try {
+    const logs = await api.get(`/projects/${projectId}/activity-logs`, { task_id: taskId, page: 1, size: 50 });
+    if (!currentTask || currentTask.id !== taskId) return;
+    container.innerHTML = logs.length ? logs.map(activityLogRowMarkup).join("")
+      : '<p class="muted">Chưa có hoạt động nào cho công việc này.</p>';
+  } catch (error) {
+    container.innerHTML = `<p class="status status-error">${escapeHtml(error.message)}</p>`;
+  }
+}
+
 async function loadTaskExtras(taskId) {
   try {
     const [checklist, comments, attachments] = await Promise.all([
@@ -748,6 +931,9 @@ async function loadTaskExtras(taskId) {
     renderChecklist(checklist);
     renderComments(comments);
     renderAttachments(attachments);
+    if (currentTaskModalTab === "activity") {
+      loadTaskActivity(taskId);
+    }
   } catch (error) {
     showToast(error.message, "error");
   }
@@ -756,19 +942,49 @@ async function loadTaskExtras(taskId) {
 function renderChecklist(summary) {
   const completedCount = summary.completed_items || 0;
   const totalCount = summary.total_items || 0;
-  document.getElementById("checklist-progress").textContent = `${completedCount}/${totalCount} · ${Math.round(summary.progress_percent || 0)}%`;
-  document.getElementById("checklist-items").innerHTML = summary.items.length ? summary.items.map((item) => `
+  const pct = Math.round(summary.progress_percent || 0);
+  currentChecklistItems = summary.items || [];
+  document.getElementById("checklist-progress").textContent = `${completedCount}/${totalCount} · ${pct}%`;
+  const fill = document.getElementById("checklist-progress-fill");
+  if (fill) {
+    fill.style.width = `${pct}%`;
+    fill.style.background = pct >= 100 && totalCount > 0 ? "var(--ok)" : "var(--accent)";
+  }
+  document.getElementById("checklist-items").innerHTML = currentChecklistItems.length ? currentChecklistItems.map((item, idx) => `
     <div class="checklist-item" data-checklist-id="${item.id}">
       <input type="checkbox" ${item.is_done ? "checked" : ""} ${canEdit ? "" : "disabled"}>
       <span style="${item.is_done ? "text-decoration:line-through;color:var(--muted);" : ""}">${escapeHtml(item.content)}</span>
-      ${canEdit ? `<button type="button" class="column-action" data-checklist-delete="${item.id}" aria-label="Xoá mục">×</button>` : ""}
+      ${canEdit ? `<span class="checklist-actions">
+        <button type="button" class="column-action" data-checklist-move="up" data-checklist-id="${item.id}" title="Đưa lên trên" aria-label="Đưa lên trên" ${idx === 0 ? "disabled" : ""}>${iconSvg("chevronUp")}</button>
+        <button type="button" class="column-action icon-rotate-down" data-checklist-move="down" data-checklist-id="${item.id}" title="Đưa xuống dưới" aria-label="Đưa xuống dưới" ${idx === currentChecklistItems.length - 1 ? "disabled" : ""}>${iconSvg("chevronUp")}</button>
+        <button type="button" class="column-action" data-checklist-edit="${item.id}" title="Sửa mục" aria-label="Sửa mục">${iconSvg("edit")}</button>
+        <button type="button" class="column-action" data-checklist-delete="${item.id}" title="Xoá mục" aria-label="Xoá mục">${iconSvg("trash")}</button>
+      </span>` : ""}
     </div>`).join("") : '<p class="muted">Chưa có mục checklist nào.</p>';
   document.getElementById("checklist-form").hidden = !canEdit;
 }
 
 function renderComments(comments) {
-  document.getElementById("task-comments").innerHTML = comments.length ? comments.map((comment) => `
-    <article class="task-comment"><span class="comment-avatar">${escapeHtml(initials(comment.user_full_name || "Người dùng"))}</span><div><strong>${escapeHtml(comment.user_full_name || "Tài khoản")}</strong><time>${escapeHtml(formatDateTime(comment.created_at))}</time><p>${escapeHtml(comment.content)}</p></div></article>`).join("") : '<p class="muted">Chưa có bình luận nào.</p>';
+  currentComments = comments || [];
+  document.getElementById("task-comments").innerHTML = currentComments.length ? currentComments.map((comment) => {
+    const canModify = canEdit && (comment.user_id === currentUser?.id || ["owner", "manager"].includes(projectData?.user_role));
+    return `<article class="task-comment" data-comment-id="${comment.id}">
+      <span class="comment-avatar">${escapeHtml(initials(comment.user_full_name || "Người dùng"))}</span>
+      <div class="task-comment-body">
+        <div class="comment-header">
+          <div>
+            <strong>${escapeHtml(comment.user_full_name || "Tài khoản")}</strong>
+            <time>${escapeHtml(formatDateTime(comment.created_at))}</time>
+          </div>
+          ${canModify ? `<span class="comment-actions">
+            <button type="button" class="comment-action-btn" data-comment-edit="${comment.id}">Sửa</button>
+            <button type="button" class="comment-action-btn danger" data-comment-delete="${comment.id}">Xoá</button>
+          </span>` : ""}
+        </div>
+        <p>${escapeHtml(comment.content)}</p>
+      </div>
+    </article>`;
+  }).join("") : '<p class="muted">Chưa có bình luận nào.</p>';
   document.getElementById("comment-form").hidden = !canEdit;
 }
 
@@ -853,6 +1069,7 @@ document.getElementById("checklist-form").querySelector("button").addEventListen
     input.value = "";
     const data = await api.get(`/projects/${projectId}/tasks/${currentTask.id}/checklist/summary`);
     renderChecklist(data);
+    scheduleSilentBoardSync(150);
   } catch (error) {
     showToast(error.message, "error");
   }
@@ -864,6 +1081,7 @@ document.getElementById("checklist-items").addEventListener("change", async (eve
   try {
     await api.patch(`/projects/${projectId}/tasks/${currentTask.id}/checklist/${item.dataset.checklistId}/toggle`);
     renderChecklist(await api.get(`/projects/${projectId}/tasks/${currentTask.id}/checklist/summary`));
+    scheduleSilentBoardSync(150);
   } catch (error) {
     event.target.checked = !event.target.checked;
     showToast(error.message, "error");
@@ -871,6 +1089,49 @@ document.getElementById("checklist-items").addEventListener("change", async (eve
 });
 
 document.getElementById("checklist-items").addEventListener("click", async (event) => {
+  const moveBtn = event.target.closest("[data-checklist-move]");
+  if (moveBtn && currentTask) {
+    const id = Number(moveBtn.dataset.checklistId);
+    const dir = moveBtn.dataset.checklistMove;
+    const ids = currentChecklistItems.map((i) => i.id);
+    const idx = ids.indexOf(id);
+    const targetIdx = dir === "up" ? idx - 1 : idx + 1;
+    if (idx < 0 || targetIdx < 0 || targetIdx >= ids.length) return;
+    [ids[idx], ids[targetIdx]] = [ids[targetIdx], ids[idx]];
+    try {
+      await api.patch(`/projects/${projectId}/tasks/${currentTask.id}/checklist/reorder`, { item_ids: ids });
+      renderChecklist(await api.get(`/projects/${projectId}/tasks/${currentTask.id}/checklist/summary`));
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+    return;
+  }
+
+  const editBtn = event.target.closest("[data-checklist-edit]");
+  if (editBtn && currentTask) {
+    const itemId = Number(editBtn.dataset.checklistEdit);
+    const item = currentChecklistItems.find((i) => i.id === itemId);
+    if (!item) return;
+    const content = await showPromptModal({
+      eyebrow: "CHECKLIST",
+      title: "Chỉnh sửa mục kiểm tra",
+      label: "Nội dung mục checklist *",
+      defaultValue: item.content,
+      maxlength: 500,
+      submitText: "Lưu thay đổi",
+      requiredMessage: "Vui lòng nhập nội dung mục checklist.",
+    });
+    if (!content || content === item.content) return;
+    try {
+      await api.put(`/projects/${projectId}/tasks/${currentTask.id}/checklist/${itemId}`, { content });
+      renderChecklist(await api.get(`/projects/${projectId}/tasks/${currentTask.id}/checklist/summary`));
+      showToast("Đã cập nhật mục checklist");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+    return;
+  }
+
   const button = event.target.closest("[data-checklist-delete]");
   if (!button || !currentTask) return;
   const ok = await showConfirmModal({
@@ -884,8 +1145,57 @@ document.getElementById("checklist-items").addEventListener("click", async (even
   try {
     await api.delete(`/projects/${projectId}/tasks/${currentTask.id}/checklist/${button.dataset.checklistDelete}`);
     renderChecklist(await api.get(`/projects/${projectId}/tasks/${currentTask.id}/checklist/summary`));
+    scheduleSilentBoardSync(150);
   } catch (error) {
     showToast(error.message, "error");
+  }
+});
+
+document.getElementById("task-comments").addEventListener("click", async (event) => {
+  const editBtn = event.target.closest("[data-comment-edit]");
+  if (editBtn && currentTask) {
+    const commentId = Number(editBtn.dataset.commentEdit);
+    const comment = currentComments.find((c) => c.id === commentId);
+    if (!comment) return;
+    const content = await showPromptModal({
+      eyebrow: "BÌNH LUẬN",
+      title: "Chỉnh sửa bình luận",
+      label: "Nội dung bình luận *",
+      defaultValue: comment.content,
+      maxlength: 5000,
+      submitText: "Lưu bình luận",
+      requiredMessage: "Vui lòng nhập nội dung bình luận.",
+    });
+    if (!content || content === comment.content) return;
+    try {
+      await api.put(`/projects/${projectId}/tasks/${currentTask.id}/comments/${commentId}`, { content });
+      renderComments(await api.get(`/projects/${projectId}/tasks/${currentTask.id}/comments`));
+      showToast("Đã cập nhật bình luận");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+    return;
+  }
+
+  const deleteBtn = event.target.closest("[data-comment-delete]");
+  if (deleteBtn && currentTask) {
+    const commentId = Number(deleteBtn.dataset.commentDelete);
+    const ok = await showConfirmModal({
+      eyebrow: "BÌNH LUẬN",
+      title: "Xoá bình luận này?",
+      message: "Bình luận sẽ bị xoá khỏi công việc và không thể khôi phục.",
+      confirmText: "Xoá bình luận",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.delete(`/projects/${projectId}/tasks/${currentTask.id}/comments/${commentId}`);
+      renderComments(await api.get(`/projects/${projectId}/tasks/${currentTask.id}/comments`));
+      scheduleSilentBoardSync(150);
+      showToast("Đã xoá bình luận");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
   }
 });
 
@@ -903,6 +1213,7 @@ document.getElementById("comment-form").querySelector("button").addEventListener
     await api.post(`/projects/${projectId}/tasks/${currentTask.id}/comments`, { content });
     input.value = "";
     renderComments(await api.get(`/projects/${projectId}/tasks/${currentTask.id}/comments`));
+    scheduleSilentBoardSync(150);
   } catch (error) {
     showToast(error.message, "error");
   }
@@ -1082,21 +1393,94 @@ function setProjectTab(tab) {
   if (isStats) renderStatsView();
 }
 
-async function loadActivity() {
+const ACTIVITY_ACTION_LABELS = {
+  created: "đã tạo mới",
+  updated: "đã cập nhật",
+  moved: "đã di chuyển",
+  deleted: "đã xoá",
+  restored: "đã khôi phục",
+  assigned: "đã giao việc",
+  unassigned: "đã bỏ giao việc",
+};
+
+const ACTIVITY_ENTITY_LABELS = {
+  task: "Công việc",
+  comment: "Bình luận",
+  attachment: "Tệp đính kèm",
+  assignee: "Phân công",
+  list: "Cột trạng thái",
+  label: "Nhãn",
+  project: "Dự án",
+};
+
+function activityLogRowMarkup(log) {
+  const actionLabel = ACTIVITY_ACTION_LABELS[log.action] || log.action.replaceAll("_", " ");
+  const entityLabel = ACTIVITY_ENTITY_LABELS[log.entity_type] || log.entity_type;
+  const taskTag = log.task_id ? ` #${log.task_id}` : "";
+  const detailBlocks = [];
+  if (log.old_value) detailBlocks.push(`Trước: ${log.old_value}`);
+  if (log.new_value) detailBlocks.push(`Sau: ${log.new_value}`);
+  return `<article class="activity-row"><span class="activity-mark">${escapeHtml(initials(log.user_full_name || "U"))}</span>
+    <div><strong>${escapeHtml(log.user_full_name || "Tài khoản")}</strong> <span>${escapeHtml(actionLabel)} · ${escapeHtml(entityLabel)}${escapeHtml(taskTag)}</span>
+      <time>${escapeHtml(formatDateTime(log.created_at))}</time>
+      ${detailBlocks.length ? `<details><summary>Xem dữ liệu thay đổi</summary><pre>${escapeHtml(detailBlocks.join("\n"))}</pre></details>` : ""}
+    </div></article>`;
+}
+
+function populateActivityUserFilter() {
+  if (!activityUserFilter) return;
+  const current = activityUserFilter.value;
+  activityUserFilter.innerHTML = `<option value="">Mọi thành viên</option>`
+    + (members || []).map((m) => {
+      const name = m.user?.full_name || m.user?.email || `Thành viên #${m.user_id}`;
+      return `<option value="${m.user_id}" ${String(m.user_id) === current ? "selected" : ""}>${escapeHtml(name)}</option>`;
+    }).join("");
+}
+
+async function loadActivity(page = 1) {
   const container = document.getElementById("activity-list");
+  const pagination = document.getElementById("activity-pagination");
+  const pageInfo = document.getElementById("activity-page-info");
+  const prevBtn = document.getElementById("activity-prev-page");
+  const nextBtn = document.getElementById("activity-next-page");
+  populateActivityUserFilter();
   container.innerHTML = '<p class="muted">Đang tải nhật ký…</p>';
   try {
-    const logs = await api.get(`/projects/${projectId}/activity-logs`, { page: 1, size: 100 });
-    container.innerHTML = logs.length ? logs.map((log) => `
-      <article class="activity-row"><span class="activity-mark">${escapeHtml(initials(log.user_full_name || "U"))}</span>
-        <div><strong>${escapeHtml(log.user_full_name || "Tài khoản")}</strong> <span>${escapeHtml(log.action.replaceAll("_", " "))} · ${escapeHtml(log.entity_type)}</span>
-          <time>${escapeHtml(formatDateTime(log.created_at))}</time>
-          ${log.new_value ? `<details><summary>Xem dữ liệu thay đổi</summary><pre>${escapeHtml(log.new_value)}</pre></details>` : ""}
-        </div></article>`).join("") : '<p class="empty-state">Chưa có hoạt động nào được ghi nhận.</p>';
+    const params = { page, size: ACTIVITY_PAGE_SIZE };
+    if (activityUserFilter?.value) params.user_id = Number(activityUserFilter.value);
+    if (activityActionFilter?.value) params.action = activityActionFilter.value;
+    if (activityEntityFilter?.value) params.entity_type = activityEntityFilter.value;
+
+    const response = await http.get(`/projects/${projectId}/activity-logs`, { params });
+    const logs = response.data || [];
+    const total = Number(response.headers?.["x-total-count"] ?? logs.length);
+    activityPage = Number(response.headers?.["x-page"] ?? page) || 1;
+    activityTotalPages = Math.max(1, Number(response.headers?.["x-total-pages"] ?? Math.ceil(total / ACTIVITY_PAGE_SIZE)) || 1);
+
+    container.innerHTML = logs.length ? logs.map(activityLogRowMarkup).join("")
+      : '<p class="empty-state">Không có hoạt động nào khớp bộ lọc.</p>';
+
+    if (pagination) {
+      pagination.hidden = total === 0;
+      if (pageInfo) pageInfo.textContent = `Trang ${activityPage} / ${activityTotalPages} · Tổng ${total} hoạt động`;
+      if (prevBtn) prevBtn.disabled = activityPage <= 1;
+      if (nextBtn) nextBtn.disabled = activityPage >= activityTotalPages;
+    }
   } catch (error) {
     container.innerHTML = `<p class="status status-error">${escapeHtml(error.message)}</p>`;
+    if (pagination) pagination.hidden = true;
   }
 }
+
+activityUserFilter?.addEventListener("change", () => loadActivity(1));
+activityActionFilter?.addEventListener("change", () => loadActivity(1));
+activityEntityFilter?.addEventListener("change", () => loadActivity(1));
+document.getElementById("activity-prev-page")?.addEventListener("click", () => {
+  if (activityPage > 1) loadActivity(activityPage - 1);
+});
+document.getElementById("activity-next-page")?.addEventListener("click", () => {
+  if (activityPage < activityTotalPages) loadActivity(activityPage + 1);
+});
 
 document.querySelector(".tabs").addEventListener("click", (event) => {
   const link = event.target.closest("[data-project-tab]");
@@ -1340,6 +1724,7 @@ retryButton.addEventListener("click", loadBoard);
 searchInput.addEventListener("input", renderBoard);
 priorityFilter.addEventListener("change", renderBoard);
 assigneeFilter?.addEventListener("change", renderBoard);
+labelFilter?.addEventListener("change", renderBoard);
 document.querySelector(".header-search input")?.addEventListener("input", (event) => {
   searchInput.value = event.target.value;
   renderBoard();
