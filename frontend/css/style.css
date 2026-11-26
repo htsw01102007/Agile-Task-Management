@@ -4598,112 +4598,47 @@ svg.icon {
 }
 
 /* ==========================================================================
-   LIQUID GLASS DESIGN SYSTEM v3 & SMOOTH COLUMN DRAG-AND-DROP
+   MINIMAL LIQUID GLASS (SOFT FROSTED) & SMOOTH COLUMN DRAG-AND-DROP
    ========================================================================== */
 :root {
-  --lg-surface: rgba(255, 255, 255, 0.66);
-  --lg-surface-strong: rgba(255, 255, 255, 0.80);
-  --lg-surface-elevated: rgba(255, 255, 255, 0.88);
-  --lg-surface-soft: rgba(255, 255, 255, 0.48);
-  --lg-border: rgba(255, 255, 255, 0.82);
-  --lg-border-subtle: rgba(148, 163, 184, 0.22);
-  --lg-blur: blur(22px) saturate(185%);
-  --lg-blur-heavy: blur(28px) saturate(195%);
+  --lg-surface: rgba(255, 255, 255, 0.82);
+  --lg-surface-elevated: rgba(255, 255, 255, 0.94);
+  --lg-border: rgba(226, 232, 240, 0.88);
+  --lg-blur: blur(14px) saturate(140%);
+  --lg-blur-heavy: blur(18px) saturate(150%);
   --lg-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.94),
-    inset 0 -1px 0 0 rgba(255, 255, 255, 0.38),
-    0 10px 28px -8px rgba(30, 41, 59, 0.08),
-    0 2px 6px -1px rgba(30, 41, 59, 0.04);
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 2px 10px -2px rgba(15, 23, 42, 0.04);
   --lg-shadow-hover:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.98),
-    inset 0 -1px 0 0 rgba(255, 255, 255, 0.5),
-    0 18px 38px -10px rgba(79, 70, 229, 0.14),
-    0 4px 12px -2px rgba(30, 41, 59, 0.06);
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 8px 22px -6px rgba(15, 23, 42, 0.07);
 }
 
-/* Ambient Refracting Aurora Mesh Canvas */
+/* Nền sáng dịu nhẹ, tối giản để không gây rối mắt */
 body {
-  background-color: #edf1fb;
+  background-color: #f4f6fb;
   background-image:
-    radial-gradient(circle at 12% 8%, rgba(99, 102, 241, 0.16) 0%, transparent 42%),
-    radial-gradient(circle at 88% 14%, rgba(56, 189, 248, 0.15) 0%, transparent 38%),
-    radial-gradient(circle at 78% 86%, rgba(168, 85, 247, 0.13) 0%, transparent 44%),
-    radial-gradient(circle at 22% 88%, rgba(16, 185, 129, 0.10) 0%, transparent 40%),
-    linear-gradient(180deg, #f3f6fd 0%, #eaf0fb 100%);
+    radial-gradient(circle at 10% 6%, rgba(94, 106, 210, 0.07) 0%, transparent 45%),
+    radial-gradient(circle at 90% 12%, rgba(56, 189, 248, 0.05) 0%, transparent 40%);
   background-attachment: fixed;
 }
 
-/* Frosted Liquid Glass Header & Sidebar */
+/* Header & Sidebar kính mờ nhẹ, viền đơn thanh mảnh */
 .hdr {
-  background: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.80);
   backdrop-filter: var(--lg-blur-heavy);
   -webkit-backdrop-filter: var(--lg-blur-heavy);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.78);
-  box-shadow:
-    inset 0 -1px 0 rgba(148, 163, 184, 0.18),
-    0 4px 20px -4px rgba(15, 23, 42, 0.05);
+  border-bottom: 1px solid var(--lg-border);
 }
 
 .side {
-  background: rgba(255, 255, 255, 0.54);
+  background: rgba(255, 255, 255, 0.76);
   backdrop-filter: var(--lg-blur-heavy);
   -webkit-backdrop-filter: var(--lg-blur-heavy);
-  border-right: 1px solid rgba(255, 255, 255, 0.78);
-  box-shadow: inset -1px 0 0 rgba(148, 163, 184, 0.16);
+  border-right: 1px solid var(--lg-border);
 }
 
-.workspace-pill {
-  background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  border: 1px solid var(--lg-border);
-  box-shadow: var(--lg-shadow);
-}
-
-.nav-i {
-  border-radius: 10px;
-  transition: all 0.18s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.nav-i:hover {
-  background: rgba(255, 255, 255, 0.66);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
-}
-
-.nav-i.current {
-  background: linear-gradient(135deg, rgba(94, 106, 210, 0.16) 0%, rgba(139, 92, 246, 0.12) 100%);
-  border: 1px solid rgba(99, 102, 241, 0.28);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.85),
-    0 4px 12px -3px rgba(94, 106, 210, 0.16);
-}
-
-.sidebar-bottom {
-  background: rgba(255, 255, 255, 0.56);
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 12px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-}
-
-.header-search {
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(14px) saturate(170%);
-  -webkit-backdrop-filter: blur(14px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  border-radius: 999px;
-  padding: 6px 14px;
-  box-shadow:
-    inset 0 1px 2px rgba(15, 23, 42, 0.04),
-    0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-.header-search:focus-within {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(94, 106, 210, 0.65);
-  box-shadow: 0 0 0 4px rgba(94, 106, 210, 0.16), 0 8px 20px -4px rgba(94, 106, 210, 0.12);
-}
-
-/* Liquid Glass Panels & Cards */
+/* Các khối nội dung & thẻ thống kê kính mờ tinh gọn (không viền kép) */
 .content-panel,
 .metric-card,
 .project-card,
@@ -4716,7 +4651,6 @@ body {
   backdrop-filter: var(--lg-blur);
   -webkit-backdrop-filter: var(--lg-blur);
   border: 1px solid var(--lg-border);
-  outline: 1px solid var(--lg-border-subtle);
   box-shadow: var(--lg-shadow);
 }
 
@@ -4725,155 +4659,30 @@ body {
 .board-insight:hover,
 .member-stat-card:hover,
 .my-task-row:hover {
-  background: var(--lg-surface-strong);
-  border-color: rgba(255, 255, 255, 0.95);
-  outline-color: rgba(99, 102, 241, 0.34);
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(199, 210, 254, 0.95);
   box-shadow: var(--lg-shadow-hover);
 }
 
-.auth-split .auth-card {
-  background: rgba(255, 255, 255, 0.76);
-}
-
-/* Deep Iridescent Hero Banner */
-.hero-banner {
-  background:
-    radial-gradient(circle at 85% 15%, rgba(129, 140, 248, 0.38) 0%, transparent 48%),
-    radial-gradient(circle at 18% 90%, rgba(56, 189, 248, 0.22) 0%, transparent 45%),
-    linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 27, 75, 0.90) 52%, rgba(55, 48, 163, 0.88) 100%);
-  backdrop-filter: var(--lg-blur);
-  -webkit-backdrop-filter: var(--lg-blur);
-  border: 1px solid rgba(165, 180, 252, 0.34);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    0 18px 40px -12px rgba(30, 27, 75, 0.32);
-}
-
-/* Liquid Glass Buttons, Pills & Tabs */
-.btn,
-.header-auth,
-.filter-btn {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(12px) saturate(165%);
-  -webkit-backdrop-filter: blur(12px) saturate(165%);
-  border: 1px solid rgba(255, 255, 255, 0.88);
-  outline: 1px solid rgba(148, 163, 184, 0.24);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.92),
-    0 2px 6px rgba(15, 23, 42, 0.04);
-  transition: all 0.18s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.btn:hover:not(:disabled),
-.header-auth:hover,
-.filter-btn:hover {
-  background: rgba(255, 255, 255, 0.92);
-  outline-color: rgba(99, 102, 241, 0.35);
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 6px 14px -3px rgba(15, 23, 42, 0.08);
-}
-
-.btn-primary {
-  background: linear-gradient(180deg, #6d78e6 0%, #515cd1 55%, #434cc0 100%) !important;
-  color: #ffffff !important;
-  border: 1px solid rgba(255, 255, 255, 0.32) !important;
-  outline: 1px solid rgba(67, 56, 202, 0.55) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    0 6px 18px -4px rgba(79, 70, 229, 0.45) !important;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #7782ee 0%, #5864db 55%, #4953cb 100%) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 10px 24px -4px rgba(79, 70, 229, 0.55) !important;
-}
-
-.btn-danger {
-  background: rgba(254, 242, 242, 0.78) !important;
-  color: var(--err-ink) !important;
-  border: 1px solid rgba(255, 255, 255, 0.85) !important;
-  outline: 1px solid rgba(239, 68, 68, 0.3) !important;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: rgba(254, 226, 226, 0.92) !important;
-  outline-color: rgba(239, 68, 68, 0.5) !important;
-}
-
-.btn-glass {
-  background: rgba(255, 255, 255, 0.14) !important;
-  backdrop-filter: blur(14px) saturate(180%);
-  -webkit-backdrop-filter: blur(14px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.28) !important;
-  outline: none !important;
-  color: #ffffff !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32) !important;
-}
-
-.btn-glass:hover {
-  background: rgba(255, 255, 255, 0.24) !important;
-}
-
-.pill-tabs,
-.task-modal-tabs {
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
-}
-
-.tabs {
-  background: rgba(255, 255, 255, 0.52);
-  backdrop-filter: blur(16px) saturate(175%);
-  -webkit-backdrop-filter: blur(16px) saturate(175%);
-  padding: 5px 8px;
-  border-radius: 13px;
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  outline: 1px solid var(--lg-border-subtle);
-  box-shadow: var(--lg-shadow);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.82);
-}
-
-.tabs a {
-  border-radius: 9px;
-  border-bottom: 0 !important;
-  padding: 8px 14px;
-}
-
-.tabs a.active {
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--accent);
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 2px 8px -2px rgba(94, 106, 210, 0.18);
-}
-
-/* Liquid Glass Kanban Columns, Cards & Column Drag-and-Drop */
+/* Cột Kanban kính mờ thoáng mắt & Kéo thả đổi vị trí cột */
 .board-column {
   position: relative;
-  background: rgba(255, 255, 255, 0.50);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  outline: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.76);
+  backdrop-filter: blur(12px) saturate(135%);
+  -webkit-backdrop-filter: blur(12px) saturate(135%);
+  border: 1px solid var(--lg-border);
+  border-radius: 14px;
   box-shadow: var(--lg-shadow);
   transition:
-    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.2s ease,
-    border-color 0.2s ease,
-    opacity 0.2s ease;
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    opacity 0.18s ease;
 }
 
 .board-column.board-column-done {
-  background: linear-gradient(180deg, rgba(236, 253, 245, 0.64) 0%, rgba(209, 250, 229, 0.44) 100%);
-  border-color: rgba(255, 255, 255, 0.86);
-  outline-color: rgba(16, 185, 129, 0.28);
+  background: rgba(240, 253, 244, 0.74);
+  border-color: rgba(167, 243, 208, 0.85);
 }
 
 .column-title[data-list-drag-handle] {
@@ -4906,114 +4715,66 @@ body {
 }
 
 .board-column.dragging-column {
-  opacity: 0.48;
-  transform: scale(0.98);
-  outline-color: var(--accent);
+  opacity: 0.5;
+  transform: scale(0.985);
+  border-color: var(--accent);
 }
 
 .board-column.drop-column-before::before,
 .board-column.drop-column-after::after {
   content: "";
   position: absolute;
-  top: 8px;
-  bottom: 8px;
-  width: 4px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
   border-radius: 99px;
-  background: linear-gradient(180deg, #6366f1, #38bdf8);
-  box-shadow: 0 0 14px rgba(99, 102, 241, 0.75);
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(94, 106, 210, 0.45);
   pointer-events: none;
   z-index: 10;
 }
 
 .board-column.drop-column-before::before {
-  left: -10px;
+  left: -9px;
 }
 
 .board-column.drop-column-after::after {
-  right: -10px;
+  right: -9px;
 }
 
 .task-card {
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(255, 255, 255, 0.94);
-  outline: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 13px;
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 4px 12px -3px rgba(15, 23, 42, 0.05);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 11px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 .task-card:hover {
-  background: rgba(255, 255, 255, 0.96);
-  outline-color: rgba(94, 106, 210, 0.42);
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 12px 24px -6px rgba(79, 70, 229, 0.14);
+  background: #ffffff;
+  border-color: rgba(94, 106, 210, 0.38);
+  box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.07);
 }
 
-.add-list,
-.add-task {
-  background: rgba(255, 255, 255, 0.44);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px dashed rgba(99, 102, 241, 0.34);
-}
-
-.add-list:hover,
-.add-task:hover {
-  background: rgba(255, 255, 255, 0.78);
-  border-style: solid;
-  border-color: rgba(99, 102, 241, 0.5);
-}
-
-/* Liquid Glass Inputs, Dropdowns, Modals & Toasts */
-input:not([type="checkbox"]):not([type="color"]),
-textarea,
-select {
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(203, 213, 225, 0.85);
-  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
-}
-
-input:not([type="checkbox"]):not([type="color"]):focus,
-textarea:focus,
-select:focus {
-  background: rgba(255, 255, 255, 0.96);
-}
-
+/* Hộp thoại, Dropdown & Toast kính mờ phẳng sạch */
 .app-dialog {
   background: var(--lg-surface-elevated);
   backdrop-filter: var(--lg-blur-heavy);
   -webkit-backdrop-filter: var(--lg-blur-heavy);
-  border: 1px solid rgba(255, 255, 255, 0.92);
-  outline: 1px solid rgba(148, 163, 184, 0.25);
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 32px 72px -12px rgba(15, 23, 42, 0.32);
+  border: 1px solid var(--lg-border);
+  box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.24);
 }
 
 .app-dialog::backdrop {
-  background: rgba(15, 23, 42, 0.36);
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
-}
-
-.task-editor-side {
-  background: rgba(244, 246, 252, 0.68);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  outline: 1px solid rgba(148, 163, 184, 0.2);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .notif-dropdown,
 .search-dropdown,
 .toast {
-  background: rgba(255, 255, 255, 0.84) !important;
+  background: var(--lg-surface-elevated);
   backdrop-filter: var(--lg-blur-heavy);
   -webkit-backdrop-filter: var(--lg-blur-heavy);
-  border: 1px solid rgba(255, 255, 255, 0.92) !important;
-  outline: 1px solid rgba(148, 163, 184, 0.24);
-  box-shadow:
-    inset 0 1px 0 #ffffff,
-    0 20px 44px -10px rgba(15, 23, 42, 0.18) !important;
+  border: 1px solid var(--lg-border);
 }
