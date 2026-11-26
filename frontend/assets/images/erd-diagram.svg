@@ -1,0 +1,269 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1760 880" width="1760" height="880" font-family="Inter, Segoe UI, Arial, sans-serif">
+  <defs>
+    <style>
+      .bg { fill: #f8fafc; }
+      .card { fill: #ffffff; stroke-width: 2; rx: 10; }
+      .hdr-txt { fill: #ffffff; font-size: 13.5px; font-weight: 700; }
+      .col-txt { fill: #334155; font-size: 11.5px; font-family: Consolas, ui-monospace, monospace; }
+      .pk { fill: #b45309; font-weight: 700; }
+      .fk { fill: #4338ca; font-weight: 700; }
+      .pfk { fill: #047857; font-weight: 700; }
+      .rel { fill: none; stroke-width: 2.2; }
+      .rel-dash { fill: none; stroke-width: 1.8; stroke-dasharray: 6 4; }
+      .badge { rx: 9; stroke-width: 1; }
+      .badge-txt { font-size: 10px; font-weight: 700; text-anchor: middle; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1760" height="880" rx="16"/>
+
+  <!-- CONNECTOR LINES -->
+  <!-- Auth vertical -->
+  <path class="rel" stroke="#6366f1" d="M 180 210 L 180 268"/>
+  <path class="rel" stroke="#6366f1" d="M 180 416 L 180 472"/>
+
+  <!-- Users to Projects, Members, Invitations, Notifications -->
+  <path class="rel" stroke="#10b981" d="M 320 118 L 430 118"/>
+  <path class="rel" stroke="#10b981" d="M 320 155 L 375 155 L 375 348 L 430 348"/>
+  <path class="rel-dash" stroke="#10b981" d="M 320 178 L 360 178 L 360 560 L 430 560"/>
+  <path class="rel-dash" stroke="#7c3aed" d="M 320 196 L 346 196 L 346 765 L 430 765"/>
+
+  <!-- Projects to Members, Invitations, Lists, Tasks, Labels -->
+  <path class="rel" stroke="#10b981" d="M 570 226 L 570 268"/>
+  <path class="rel" stroke="#10b981" d="M 570 432 L 570 472"/>
+  <path class="rel" stroke="#f59e0b" d="M 710 118 L 820 118"/>
+  <path class="rel" stroke="#ea580c" d="M 710 154 L 768 154 L 768 380 L 820 380"/>
+  <path class="rel" stroke="#d97706" d="M 710 185 L 752 185 L 752 745 L 820 745"/>
+
+  <!-- Lists to Tasks (Composite FK) -->
+  <path class="rel" stroke="#ea580c" stroke-width="2.8" d="M 960 226 L 960 282"/>
+
+  <!-- Tasks to Assignees, Checklist, TaskLabels, Comments, Attachments, ActivityLogs -->
+  <path class="rel" stroke="#0284c7" d="M 1100 350 L 1156 350 L 1156 125 L 1210 125"/>
+  <path class="rel" stroke="#0284c7" d="M 1100 405 L 1210 405"/>
+  <path class="rel" stroke="#0284c7" d="M 1100 465 L 1156 465 L 1156 645 L 1210 645"/>
+  <path class="rel" stroke="#d97706" d="M 1100 745 L 1156 745 L 1156 685 L 1210 685"/>
+
+  <path class="rel" stroke="#7c3aed" d="M 1100 505 L 1138 505 L 1138 242 L 1525 242 L 1525 140 L 1555 140"/>
+  <path class="rel" stroke="#7c3aed" d="M 1100 535 L 1525 535 L 1525 415 L 1555 415"/>
+  <path class="rel" stroke="#7c3aed" d="M 1100 565 L 1525 565 L 1525 705 L 1555 705"/>
+
+  <!-- CARDINALITY BADGES -->
+  <rect class="badge" x="352" y="98" width="46" height="20" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text class="badge-txt" x="375" y="112" fill="#047857">1 : N</text>
+
+  <rect class="badge" x="742" y="98" width="46" height="20" fill="#fffbeb" stroke="#fde68a"/>
+  <text class="badge-txt" x="765" y="112" fill="#b45309">1 : N</text>
+
+  <rect class="badge" x="937" y="244" width="46" height="20" fill="#fff7ed" stroke="#fed7aa"/>
+  <text class="badge-txt" x="960" y="258" fill="#c2410c">1 : N</text>
+
+  <rect class="badge" x="1133" y="385" width="46" height="20" fill="#f0f9ff" stroke="#bae6fd"/>
+  <text class="badge-txt" x="1156" y="399" fill="#0369a1">1 : N</text>
+
+  <!-- ================= COLUMN 1: AUTH & SECURITY ================= -->
+  <g transform="translate(40, 32)">
+    <rect class="card" width="280" height="192" stroke="#4f46e5"/>
+    <rect width="280" height="34" rx="9" fill="#4f46e5"/>
+    <text class="hdr-txt" x="140" y="22" text-anchor="middle">users</text>
+    <text class="col-txt" x="14" y="56"><tspan class="pk">[PK]</tspan> id BIGINT UNSIGNED</text>
+    <text class="col-txt" x="14" y="76">     email VARCHAR UNIQUE</text>
+    <text class="col-txt" x="14" y="96">     username VARCHAR UNIQUE</text>
+    <text class="col-txt" x="14" y="116">     password_hash VARCHAR</text>
+    <text class="col-txt" x="14" y="136">     full_name, avatar_url</text>
+    <text class="col-txt" x="14" y="156">     system_role ('admin'|'user')</text>
+    <text class="col-txt" x="14" y="176">     is_active, token_version</text>
+  </g>
+
+  <g transform="translate(40, 268)">
+    <rect class="card" width="280" height="150" stroke="#6366f1"/>
+    <rect width="280" height="34" rx="9" fill="#6366f1"/>
+    <text class="hdr-txt" x="140" y="22" text-anchor="middle">oauth_accounts</text>
+    <text class="col-txt" x="14" y="56"><tspan class="pk">[PK]</tspan> id BIGINT UNSIGNED</text>
+    <text class="col-txt" x="14" y="78"><tspan class="fk">[FK]</tspan> user_id -&gt; users.id</text>
+    <text class="col-txt" x="14" y="100">     provider ('google')</text>
+    <text class="col-txt" x="14" y="122">     provider_user_id VARCHAR</text>
+  </g>
+
+  <g transform="translate(40, 472)">
+    <rect class="card" width="280" height="150" stroke="#6366f1"/>
+    <rect width="280" height="34" rx="9" fill="#6366f1"/>
+    <text class="hdr-txt" x="140" y="22" text-anchor="middle">password_reset_tokens</text>
+    <text class="col-txt" x="14" y="56"><tspan class="pk">[PK]</tspan> id BIGINT UNSIGNED</text>
+    <text class="col-txt" x="14" y="78"><tspan class="fk">[FK]</tspan> user_id -&gt; users.id</text>
+    <text class="col-txt" x="14" y="100">     token_hash CHAR(64)</text>
+    <text class="col-txt" x="14" y="122">     expires_at, used_at</text>
+  </g>
+
+  <g transform="translate(40, 676)">
+    <rect class="card" width="280" height="150" stroke="#475569"/>
+    <rect width="280" height="34" rx="9" fill="#475569"/>
+    <text class="hdr-txt" x="140" y="22" text-anchor="middle">revoked_tokens</text>
+    <text class="col-txt" x="14" y="56"><tspan class="pk">[PK]</tspan> id BIGINT UNSIGNED</text>
+    <text class="col-txt" x="14" y="78">     jti VARCHAR(64) UNIQUE</text>
+    <text class="col-txt" x="14" y="100">     expires_at DATETIME</text>
+    <text class="col-txt" x="14" y="122">     revoked_at DATETIME</text>
+  </g>
+
+  <!-- ================= COLUMN 2: PROJECTS & TEAM ================= -->
+  <g transform="translate(430, 32)">
+    <rect class="card" width="280" height="192" stroke="#059669"/>
+    <rect width="280" height="34" rx="9" fill="#059669"/>
+    <text class="hdr-txt" x="140" y="22" text-anchor="middle">projects</text>
+    <text class="col-txt" x="14" y="56"><tspan class="pk">[PK]</tspan> id BIGINT UNSIGNED</text>
+    <text class="col-txt" x="14" y="76"><tspan class="fk">[FK]</tspan> owner_id -&gt; users.id</text>
+    <text class="col-txt" x="14" y="96">     name VARCHAR(200)</text>
+    <text class="col-txt" x="14" y="116">     description TEXT</text>
+    <text class="col-txt" x="14" y="136">     status ('active'|'completed'|'archived')</text>
+    <text class="col-txt" x="14" y="156">     start_date, end_date</text>
+    <text class="col-txt" x="14" y="176">     deleted_at DATETIME</text>
+  </g>
+
+  <g transform="translate(430, 268)">
+    <rect class="card" width="280" height="162" stroke="#10b981"/>
+    <rect width="280" height="34" rx="9" fill="#10b981"/>
+    <text class="hdr-txt" x="140" y="22" text-anchor="middle">project_members (N : N)</text>
+    <text class="col-txt" x="14" y="58"><tspan class="pfk">[PFK]</tspan> project_id -&gt; projects.id</text>
+    <text class="col-txt" x="14" y="80"><tspan class="pfk">[PFK]</tspan> user_id -&gt; users.id</text>
+    <text class="col-txt" x="14" y="102">      role ('owner'|'manager'|</text>
+    <text class="col-txt" x="14" y="122">            'member'|'viewer')</text>
+    <text class="col-txt" x="14" y="144">      joined_at DATETIME</text>
+  </g>
+
+  <g transform="translate(430, 472)">
+    <rect class="card" width="280" height="174" stroke="#10b981"/>
+    <rect width="280" height="34" rx="9" fill="#10b981"/>
+    <text class="hdr-txt" x="140" y="22" text-anchor="middle">project_invitations</text>
+    <text class="col-txt" x="14" y="56"><tspan class="pk">[PK]</tspan> id BIGINT UNSIGNED</text>
+    <text class="col-txt" x="14" y="76"><tspan class="fk">[FK]</tspan> project_id, inviter_id</text>
+    <text class="col-txt" x="14" y="96">     invitee_email, role</text>
+    <text class="col-txt" x="14" y="116">     token CHAR(64) SHA-256</text>
+    <text class="col-txt" x="14" y="136">     status, expires_at</text>
+    <text class="col-txt" x="14" y="156">     pending_email (VIRTUAL UQ)</text>
+  </g>
+
+  <g transform="translate(430, 676)">
+    <rect class="card" width="280" height="168" stroke="#7c3aed"/>
+    <rect width="280" height="34" rx="9" fill="#7c3aed"/>
+    <text class="hdr-txt" x="140" y="22" text-anchor="middle">notifications</text>
+    <text class="col-txt" x="14" y="56"><tspan class="pk">[PK]</tspan> id BIGINT UNSIGNED</text>
+    <text class="col-txt" x="14" y="76"><tspan class="fk">[FK]</tspan> user_id -&gt; users.id</text>
+    <text class="col-txt" x="14" y="96"><tspan class="fk">[FK]</tspan> project_id -&gt; projects.id</text>
+    <text class="col-txt" x="14" y="116">     type, title, message</text>
+    <text class="col-txt" x="14" y="136">     entity_type, entity_id</text>
+    <text class="col-txt" x="14" y="156">     is_read, created_at</text>
+  </g>
+
+  <!-- ================= COLUMN 3: KANBAN CORE ================= -->
+  <g transform="translate(820, 32)">
+    <rect class="card" width="280" height="192" stroke="#d97706"/>
+    <rect width="280" height="34" rx="9" fill="#d97706"/>
+    <text class="hdr-txt" x="140" y="22" text-anchor="middle">lists (Cột Kanban)</text>
+    <text class="col-txt" x="14" y="58"><tspan class="pk">[PK]</tspan> id BIGINT UNSIGNED</text>
+    <text class="col-txt" x="14" y="80"><tspan class="fk">[FK]</tspan> project_id -&gt; projects.id</text>
+    <text class="col-txt" x="14" y="102">     name VARCHAR(100)</text>
+    <text class="col-txt" x="14" y="124">     position INT UNSIGNED</text>
+    <text class="col-txt" x="14" y="146">     is_done_column BOOLEAN</text>
+    <text class="col-txt" x="14" y="168">     UNIQUE (id, project_id)</text>
+  </g>
+
+  <g transform="translate(820, 282)">
+    <rect class="card" width="280" height="330" stroke="#ea580c" stroke-width="2.6"/>
+    <rect width="280" height="36" rx="9" fill="#ea580c"/>
+    <text class="hdr-txt" x="140" y="23" text-anchor="middle">tasks (Thực thể trung tâm)</text>
+    <text class="col-txt" x="14" y="60"><tspan class="pk">[PK]</tspan> id BIGINT UNSIGNED</text>
+    <text class="col-txt" x="14" y="82"><tspan class="fk">[FK]</tspan> project_id -&gt; projects.id</text>
+    <text class="col-txt" x="14" y="104"><tspan class="fk">[FK]</tspan> (list_id, project_id)</text>
+    <text class="col-txt" x="14" y="126"><tspan class="fk">[FK]</tspan> created_by -&gt; users.id</text>
+    <text class="col-txt" x="14" y="148">     title VARCHAR(255)</text>
+    <text class="col-txt" x="14" y="170">     description TEXT (FULLTEXT)</text>
+    <text class="col-txt" x="14" y="192">     priority ('low'..'urgent')</text>
+    <text class="col-txt" x="14" y="214">     position INT UNSIGNED</text>
+    <text class="col-txt" x="14" y="236">     start_date, due_date</text>
+    <text class="col-txt" x="14" y="258">     completed_at DATETIME</text>
+    <text class="col-txt" x="14" y="280">     is_deleted BOOLEAN</text>
+    <text class="col-txt" x="14" y="302">     deleted_at DATETIME</text>
+  </g>
+
+  <g transform="translate(820, 668)">
+    <rect class="card" width="280" height="168" stroke="#d97706"/>
+    <rect width="280" height="34" rx="9" fill="#d97706"/>
+    <text class="hdr-txt" x="140" y="22" text-anchor="middle">labels</text>
+    <text class="col-txt" x="14" y="58"><tspan class="pk">[PK]</tspan> id BIGINT UNSIGNED</text>
+    <text class="col-txt" x="14" y="80"><tspan class="fk">[FK]</tspan> project_id -&gt; projects.id</text>
+    <text class="col-txt" x="14" y="102">     name VARCHAR(50)</text>
+    <text class="col-txt" x="14" y="124">     color CHAR(7) HEX</text>
+    <text class="col-txt" x="14" y="146">     UNIQUE (project_id, name)</text>
+  </g>
+
+  <!-- ================= COLUMN 4: JUNCTION & CHECKLIST ================= -->
+  <g transform="translate(1210, 48)">
+    <rect class="card" width="275" height="156" stroke="#0284c7"/>
+    <rect width="275" height="34" rx="9" fill="#0284c7"/>
+    <text class="hdr-txt" x="137" y="22" text-anchor="middle">task_assignees (N : N)</text>
+    <text class="col-txt" x="14" y="58"><tspan class="pfk">[PFK]</tspan> task_id -&gt; tasks.id</text>
+    <text class="col-txt" x="14" y="80"><tspan class="pfk">[PFK]</tspan> user_id -&gt; users.id</text>
+    <text class="col-txt" x="14" y="102"><tspan class="fk">[FK]</tspan>  assigned_by -&gt; users.id</text>
+    <text class="col-txt" x="14" y="124">      assigned_at DATETIME</text>
+  </g>
+
+  <g transform="translate(1210, 318)">
+    <rect class="card" width="275" height="176" stroke="#0284c7"/>
+    <rect width="275" height="34" rx="9" fill="#0284c7"/>
+    <text class="hdr-txt" x="137" y="22" text-anchor="middle">checklist_items</text>
+    <text class="col-txt" x="14" y="58"><tspan class="pk">[PK]</tspan> id BIGINT UNSIGNED</text>
+    <text class="col-txt" x="14" y="80"><tspan class="fk">[FK]</tspan> task_id -&gt; tasks.id</text>
+    <text class="col-txt" x="14" y="102">     content VARCHAR(500)</text>
+    <text class="col-txt" x="14" y="124">     is_done BOOLEAN</text>
+    <text class="col-txt" x="14" y="146">     position, completed_at</text>
+  </g>
+
+  <g transform="translate(1210, 588)">
+    <rect class="card" width="275" height="142" stroke="#0284c7"/>
+    <rect width="275" height="34" rx="9" fill="#0284c7"/>
+    <text class="hdr-txt" x="137" y="22" text-anchor="middle">task_labels (N : N)</text>
+    <text class="col-txt" x="14" y="60"><tspan class="pfk">[PFK]</tspan> task_id -&gt; tasks.id</text>
+    <text class="col-txt" x="14" y="84"><tspan class="pfk">[PFK]</tspan> label_id -&gt; labels.id</text>
+    <text class="col-txt" x="14" y="110">      Gắn đa nhãn màu / task</text>
+  </g>
+
+  <!-- ================= COLUMN 5: COLLABORATION & AUDIT ================= -->
+  <g transform="translate(1555, 48)">
+    <rect class="card" width="180" height="196" stroke="#7c3aed"/>
+    <rect width="180" height="34" rx="9" fill="#7c3aed"/>
+    <text class="hdr-txt" x="90" y="22" text-anchor="middle">comments</text>
+    <text class="col-txt" x="10" y="58"><tspan class="pk">[PK]</tspan> id BIGINT</text>
+    <text class="col-txt" x="10" y="80"><tspan class="fk">[FK]</tspan> task_id</text>
+    <text class="col-txt" x="10" y="102"><tspan class="fk">[FK]</tspan> user_id</text>
+    <text class="col-txt" x="10" y="124"><tspan class="fk">[FK]</tspan> parent_id</text>
+    <text class="col-txt" x="10" y="146">content TEXT</text>
+    <text class="col-txt" x="10" y="168">deleted_at</text>
+  </g>
+
+  <g transform="translate(1555, 318)">
+    <rect class="card" width="180" height="196" stroke="#7c3aed"/>
+    <rect width="180" height="34" rx="9" fill="#7c3aed"/>
+    <text class="hdr-txt" x="90" y="22" text-anchor="middle">attachments</text>
+    <text class="col-txt" x="10" y="58"><tspan class="pk">[PK]</tspan> id BIGINT</text>
+    <text class="col-txt" x="10" y="80"><tspan class="fk">[FK]</tspan> task_id</text>
+    <text class="col-txt" x="10" y="102"><tspan class="fk">[FK]</tspan> uploaded_by</text>
+    <text class="col-txt" x="10" y="124">file_name</text>
+    <text class="col-txt" x="10" y="146">file_size</text>
+    <text class="col-txt" x="10" y="168">mime_type</text>
+  </g>
+
+  <g transform="translate(1555, 588)">
+    <rect class="card" width="180" height="226" stroke="#7c3aed"/>
+    <rect width="180" height="34" rx="9" fill="#7c3aed"/>
+    <text class="hdr-txt" x="90" y="22" text-anchor="middle">activity_logs</text>
+    <text class="col-txt" x="10" y="58"><tspan class="pk">[PK]</tspan> id BIGINT</text>
+    <text class="col-txt" x="10" y="80"><tspan class="fk">[FK]</tspan> project_id</text>
+    <text class="col-txt" x="10" y="102"><tspan class="fk">[FK]</tspan> task_id</text>
+    <text class="col-txt" x="10" y="124"><tspan class="fk">[FK]</tspan> user_id</text>
+    <text class="col-txt" x="10" y="146">entity_type</text>
+    <text class="col-txt" x="10" y="168">action</text>
+    <text class="col-txt" x="10" y="190">old_value JSON</text>
+    <text class="col-txt" x="10" y="210">new_value JSON</text>
+  </g>
+</svg>
+

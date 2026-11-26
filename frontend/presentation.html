@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trình chiếu Dự án | Agile Workspace</title>
+  <link rel="icon" href="assets/images/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --surface: #ffffff;
+      --ink: #0f172a;
+      --ink-2: #334155;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --accent: #5e6ad2;
+      --accent-soft: #eef2ff;
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --err: #ef4444;
+      --violet: #8b5cf6;
+      --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Be Vietnam Pro", "Inter", system-ui, -apple-system, sans-serif;
+      background: #0b1021;
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .deck-progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.14);
+      z-index: 100;
+    }
+
+    .deck-progress-bar {
+      height: 100%;
+      width: 12.5%;
+      background: linear-gradient(90deg, #5e6ad2, #8b5cf6, #10b981);
+      transition: width 0.55s var(--ease-spring);
+    }
+
+    .deck-stage {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 40px 64px 82px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: var(--bg);
+      opacity: 0;
+      pointer-events: none;
+      transform: translate3d(84px, 0, 0) scale(0.97);
+      transition:
+        opacity 0.58s var(--ease-spring),
+        transform 0.65s var(--ease-spring);
+      will-change: transform, opacity;
+    }
+
+    .slide.is-prev {
+      opacity: 0;
+      transform: translate3d(-84px, 0, 0) scale(0.97);
+    }
+
+    .slide.is-active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate3d(0, 0, 0) scale(1);
+      z-index: 2;
+    }
+
+    .slide-dark {
+      background: radial-gradient(circle at 82% 20%, rgba(99, 102, 241, 0.28), transparent 45%),
+                  linear-gradient(140deg, #0f172a 0%, #1e1b4b 56%, #312e81 100%);
+      color: #ffffff;
+    }
+
+    .stagger {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.52s var(--ease-spring), transform 0.58s var(--ease-spring);
+    }
+
+    .slide.is-active .stagger {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .slide.is-active .d-1 { transition-delay: 0.07s; }
+    .slide.is-active .d-2 { transition-delay: 0.14s; }
+    .slide.is-active .d-3 { transition-delay: 0.21s; }
+    .slide.is-active .d-4 { transition-delay: 0.28s; }
+
+    .slide-inner {
+      width: 100%;
+      max-width: 1420px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .eyebrow-row { display: flex; align-items: center; gap: 12px; }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 13px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid #c7d2fe;
+    }
+
+    .slide-dark .pill {
+      background: rgba(99, 102, 241, 0.2);
+      color: #c7d2fe;
+      border-color: rgba(129, 140, 248, 0.42);
+    }
+
+    .eyebrow-text {
+      font-size: 12.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--accent);
+    }
+
+    .slide-dark .eyebrow-text { color: #a5b4fc; }
+
+    h1.hero-title {
+      font-size: clamp(36px, 4.2vw, 56px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+
+    h2.slide-title {
+      font-size: clamp(24px, 2.3vw, 34px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      line-height: 1.22;
+    }
+
+    .slide-dark h2.slide-title { color: #ffffff; }
+
+    .slide-sub {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 1020px;
+      line-height: 1.5;
+    }
+
+    .slide-dark .slide-sub { color: #cbd5e1; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .split-55-45 { display: grid; grid-template-columns: 1.15fr 0.95fr; gap: 26px; align-items: stretch; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px 20px;
+      box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.06);
+      transition: transform 0.25s var(--ease-spring), box-shadow 0.25s var(--ease-spring);
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px -8px rgba(94, 106, 210, 0.14);
+    }
+
+    .card-dark {
+      background: rgba(15, 23, 42, 0.62);
+      border: 1px solid rgba(129, 140, 248, 0.32);
+      backdrop-filter: blur(12px);
+      color: #ffffff;
+    }
+
+    .card h3 {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 7px;
+      color: var(--ink);
+    }
+
+    .card-dark h3 { color: #ffffff; }
+
+    .card p, .card li {
+      font-size: 13.5px;
+      color: var(--ink-2);
+      line-height: 1.55;
+    }
+
+    .card-dark p, .card-dark li { color: #cbd5e1; }
+
+    .card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .card ul li::before {
+      content: "•";
+      color: var(--accent);
+      font-weight: 800;
+      margin-right: 8px;
+    }
+
+    .accent-left-red { border-left: 4px solid var(--err); }
+    .accent-left-indigo { border-left: 4px solid var(--accent); }
+    .accent-left-green { border-left: 4px solid var(--ok); }
+    .accent-left-amber { border-left: 4px solid var(--warn); }
+    .accent-left-violet { border-left: 4px solid var(--violet); }
+
+    .team-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .member-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 13px;
+      border-radius: 12px;
+      background: rgba(30, 41, 59, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+    }
+
+    .member-chip.leader {
+      grid-column: 1 / -1;
+      background: linear-gradient(90deg, rgba(16, 185, 129, 0.2), rgba(94, 106, 210, 0.2));
+      border-color: rgba(52, 211, 153, 0.52);
+    }
+
+    .avatar-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 11.5px;
+      background: rgba(99, 102, 241, 0.3);
+      color: #e0e7ff;
+      flex: none;
+    }
+
+    .member-chip.leader .avatar-dot {
+      background: #10b981;
+      color: #052e16;
+    }
+
+    .erd-frame {
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 16px;
+      padding: 10px;
+      box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.08);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      max-height: calc(100vh - 235px);
+      overflow: auto;
+    }
+
+    .erd-frame img {
+      width: 100%;
+      height: auto;
+      max-height: calc(100vh - 260px);
+      object-fit: contain;
+    }
+
+    .deck-dock {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.88);
+      border: 1px solid rgba(148, 163, 184, 0.26);
+      backdrop-filter: blur(14px);
+      color: #f8fafc;
+      z-index: 90;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.36);
+    }
+
+    .dock-btn {
+      appearance: none;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+
+    .dock-btn:hover { background: rgba(94, 106, 210, 0.68); }
+    .dock-btn.primary { background: var(--accent); border-color: #818cf8; }
+
+    .dock-counter {
+      font-size: 12.5px;
+      font-weight: 700;
+      padding: 0 6px;
+      min-width: 62px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .dock-timer {
+      font-size: 12px;
+      font-weight: 700;
+      color: #a5b4fc;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(99, 102, 241, 0.18);
+      cursor: pointer;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .notes-drawer {
+      position: fixed;
+      right: 20px;
+      bottom: 70px;
+      width: min(460px, calc(100vw - 40px));
+      background: rgba(15, 23, 42, 0.96);
+      color: #f1f5f9;
+      border: 1px solid rgba(129, 140, 248, 0.45);
+      border-radius: 16px;
+      padding: 16px 18px;
+      z-index: 95;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+      transform: translateY(16px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s var(--ease-spring), transform 0.28s var(--ease-spring);
+    }
+
+    .notes-drawer.open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .notes-drawer h4 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #a5b4fc;
+      margin-bottom: 6px;
+    }
+
+    .notes-drawer p {
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+
+    @media (max-width: 1024px) {
+      .slide { padding: 24px 20px 80px; overflow-y: auto; justify-content: flex-start; }
+      .split-55-45, .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="deck-progress"><div id="progress-bar" class="deck-progress-bar"></div></div>
+
+  <main class="deck-stage">
+    <!-- SLIDE 1: TRANG BÌA & NỘI DUNG TRÌNH BÀY -->
+    <section class="slide slide-dark is-active" data-speaker="Nghiêm Đình Bình (0:00 – 1:00)" data-notes="Em chào thầy Nguyễn Hữu Minh Dương và các bạn. Em là Nghiêm Đình Bình — nhóm trưởng, hôm nay đại diện nhóm 5 thành viên xin trình bày dự án Agile Workspace gồm 2 phần chính: Giới thiệu sản phẩm và Mô tả chi tiết sản phẩm (Lý do chọn đề tài, Sơ đồ ERD, Điểm hạn chế và Hướng phát triển).">
+      <div class="slide-inner split-55-45">
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="eyebrow-row stagger d-1">
+            <span class="pill">BÁO CÁO ĐỒ ÁN · ITTTRK301</span>
+            <span class="eyebrow-text">Clean SaaS &amp; Realtime WebSocket</span>
+          </div>
+          <h1 class="hero-title stagger d-2">AGILE WORKSPACE</h1>
+          <p class="slide-sub stagger d-2" style="font-size:17.5px;">
+            Hệ thống Quản lý Dự án &amp; Điều phối Công việc Nhóm theo Thời gian thực.
+          </p>
+
+          <div class="card card-dark stagger d-3">
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(148,163,184,0.22);padding-bottom:10px;margin-bottom:10px;">
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#818cf8;letter-spacing:0.08em;">GIẢNG VIÊN HƯỚNG DẪN</div>
+                <div style="font-size:18.5px;font-weight:800;color:#fff;margin-top:2px;">Thầy Nguyễn Hữu Minh Dương</div>
+              </div>
+              <span class="pill">5 Thành viên</span>
+            </div>
+            <div style="font-size:11px;font-weight:700;color:#818cf8;letter-spacing:0.08em;">ĐỘI NGŨ THỰC HIỆN</div>
+            <div class="team-grid">
+              <div class="member-chip leader">
+                <span class="avatar-dot">NB</span>
+                <div><strong style="font-size:14px;">Nghiêm Đình Bình</strong><div style="font-size:11.5px;color:#a7f3d0;">Nhóm trưởng (Team Leader)</div></div>
+              </div>
+              <div class="member-chip"><span class="avatar-dot">QD</span><div><strong style="font-size:13.5px;">Nguyễn Quý Dũng</strong><div style="font-size:11px;color:#94a3b8;">Thành viên phát triển</div></div></div>
+              <div class="member-chip"><span class="avatar-dot">MS</span><div><strong style="font-size:13.5px;">Lê Minh Sơn</strong><div style="font-size:11px;color:#94a3b8;">Thành viên phát triển</div></div></div>
+              <div class="member-chip"><span class="avatar-dot">ĐM</span><div><strong style="font-size:13.5px;">Hà Đức Minh</strong><div style="font-size:11px;color:#94a3b8;">Thành viên phát triển</div></div></div>
+              <div class="member-chip"><span class="avatar-dot">TD</span><div><strong style="font-size:13.5px;">Nguyễn Tấn Dũng</strong><div style="font-size:11px;color:#94a3b8;">Thành viên phát triển</div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card-dark stagger d-4" style="display:flex;flex-direction:column;justify-content:center;gap:14px;">
+          <span class="pill" style="align-self:flex-start;">BỐ CỤC NỘI DUNG THUYẾT TRÌNH</span>
+          <div style="padding:14px 16px;background:rgba(15,23,42,0.75);border-left:4px solid #34d399;border-radius:12px;">
+            <h3 style="color:#34d399;font-size:15px;">PHẦN 1 · GIỚI THIỆU SẢN PHẨM</h3>
+            <p style="font-size:13px;">Tổng quan nền tảng Agile Workspace, đối tượng sử dụng &amp; công nghệ Full-stack cốt lõi.</p>
+          </div>
+          <div style="padding:14px 16px;background:rgba(15,23,42,0.75);border-left:4px solid #a5b4fc;border-radius:12px;">
+            <h3 style="color:#a5b4fc;font-size:15px;">PHẦN 2 · MÔ TẢ CHI TIẾT SẢN PHẨM</h3>
+            <ul style="margin-top:6px;">
+              <li><strong>2.1. Lý do chọn dự án</strong> &amp; Bài toán thực tiễn</li>
+              <li><strong>2.2. Các phân hệ chức năng</strong> &amp; Phân quyền RBAC</li>
+              <li><strong>2.3. Sơ đồ Thực thể Liên kết (ERD)</strong> 16 bảng MySQL</li>
+              <li><strong>2.4. Điểm hạn chế</strong> &amp; Hướng phát triển tương lai</li>
+            </ul>
+          </div>
+          <div style="padding:14px 16px;background:rgba(15,23,42,0.75);border-left:4px solid #fbbf24;border-radius:12px;">
+            <h3 style="color:#fbbf24;font-size:15px;">PHẦN 3 · LIVE DEMO &amp; VẤN ĐÁP (Q&amp;A)</h3>
+            <p style="font-size:13px;">Trình diễn trực tiếp lời mời &amp; kéo thả Kanban Realtime trên Vercel.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: PHẦN 1 — GIỚI THIỆU SẢN PHẨM -->
+    <section class="slide" data-speaker="Nghiêm Đình Bình (1:00 – 2:15)" data-notes="Ở phần 1 — Giới thiệu sản phẩm: Agile Workspace là ứng dụng web quản lý công việc nhóm theo phương pháp Kanban. Sản phẩm được xây dựng trên nền tảng FastAPI, MySQL 8.0, WebSocket thời gian thực và triển khai giao diện lên Vercel.">
+      <div class="slide-inner">
+        <div class="stagger d-1">
+          <div class="eyebrow-row"><span class="pill">02 / 08</span><span class="eyebrow-text">Phần 1 · Giới thiệu sản phẩm</span></div>
+          <h2 class="slide-title" style="margin-top:6px;">Agile Workspace — Nền tảng Quản lý Công việc Nhóm Chuẩn Agile</h2>
+          <p class="slide-sub">Không gian làm việc trực tuyến giúp các nhóm lập kế hoạch, phân công, kéo thả bảng Kanban và đo lường tiến độ theo thời gian thực.</p>
+        </div>
+
+        <div class="grid-4 stagger d-2">
+          <div class="card accent-left-indigo"><h3>Sản phẩm là gì?</h3><p>Hệ thống quản trị dự án &amp; điều phối đầu việc tập trung theo mô hình bảng Kanban hiện đại.</p></div>
+          <div class="card accent-left-green"><h3>Đối tượng hướng tới</h3><p>Nhóm sinh viên làm đồ án, đội phát triển phần mềm Scrum/Agile, các nhóm vận hành vừa và nhỏ.</p></div>
+          <div class="card accent-left-violet"><h3>Điểm khác biệt cốt lõi</h3><p>Giao diện Clean SaaS không nháy trang, đồng bộ kéo thả thẻ &amp; thông báo lời mời tức thì 0ms qua WebSocket.</p></div>
+          <div class="card accent-left-amber"><h3>Triển khai thực tế</h3><p>Hoạt động trực tuyến qua HTTPS trên Vercel CDN kết nối tới cụm máy chủ FastAPI &amp; MySQL 8.0.</p></div>
+        </div>
+
+        <div class="grid-3 stagger d-3">
+          <div class="card">
+            <span class="pill" style="margin-bottom:10px;">FRONTEND · VERCEL</span>
+            <ul>
+              <li>HTML5 / CSS3 Design System &amp; Icon tối giản</li>
+              <li>JavaScript ES6+ &amp; Axios tự động gia hạn JWT</li>
+              <li>HTML5 Drag &amp; Drop Optimistic UI mượt mà</li>
+              <li>12 trang giao diện + Thanh tìm kiếm phím tắt <code>/</code></li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="pill" style="background:#ecfdf5;color:#047857;border-color:#a7f3d0;margin-bottom:10px;">BACKEND · PYTHON FASTAPI</span>
+            <ul>
+              <li>FastAPI + Uvicorn bất đồng bộ hiệu năng cao</li>
+              <li>SQLAlchemy 2.0 ORM &amp; Pydantic v2 kiểm duyệt</li>
+              <li>Bảo mật Bcrypt, JWT Revocation &amp; Google OAuth 2.0</li>
+              <li>40+ REST Endpoints &amp; 2 kênh WebSocket Realtime</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="pill" style="background:#fffbeb;color:#b45309;border-color:#fde68a;margin-bottom:10px;">DATABASE · MYSQL 8.0</span>
+            <ul>
+              <li>16 bảng chuẩn hóa InnoDB (UTF8MB4)</li>
+              <li>Giao dịch ACID &amp; khóa dòng chống xung đột</li>
+              <li>Lưu trữ dự án chỉ đọc &amp; Thùng rác khôi phục</li>
+              <li>Nhật ký kiểm vết lịch sử thay đổi dạng JSON</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 3: PHẦN 2.1 — LÝ DO CHỌN DỰ ÁN -->
+    <section class="slide" data-speaker="Nguyễn Quý Dũng (2:15 – 3:30)" data-notes="Bước sang Phần 2 — Mô tả sản phẩm, trước hết về Lý do chọn dự án: Xuất phát từ chính khó khăn khi làm bài tập nhóm qua Zalo hay Excel dễ trôi việc, khó đánh giá tỷ lệ đóng góp từng thành viên và bị trễ thông tin cập nhật.">
+      <div class="slide-inner">
+        <div class="stagger d-1">
+          <div class="eyebrow-row"><span class="pill">03 / 08</span><span class="eyebrow-text">Phần 2.1 · Mô tả sản phẩm — Lý do chọn dự án</span></div>
+          <h2 class="slide-title" style="margin-top:6px;">Tại Sao Nhóm Lựa Chọn Đề Tài Agile Workspace?</h2>
+        </div>
+
+        <div class="grid-2 stagger d-2">
+          <div class="card accent-left-red">
+            <h3>1. Khắc phục thất lạc đầu việc qua nhóm chat</h3>
+            <p>Giao việc qua Zalo/Messenger khiến yêu cầu nhanh chóng bị trôi, không rõ ai phụ trách chính, thiếu hạn chót và tài liệu đính kèm nằm rải rác.</p>
+            <p style="margin-top:8px;font-weight:700;color:var(--accent);">➔ Tập trung mọi mô tả, checklist con, bình luận và tệp đính kèm vào từng thẻ việc trên bảng Kanban.</p>
+          </div>
+
+          <div class="card accent-left-amber">
+            <h3>2. Đo lường minh bạch đóng góp của từng thành viên</h3>
+            <p>Trong làm việc nhóm, nhóm trưởng rất khó định lượng chính xác mỗi người đang gánh bao nhiêu phần trăm dự án hay ai có việc quá hạn.</p>
+            <p style="margin-top:8px;font-weight:700;color:var(--accent);">➔ Xây dựng Tab Thống kê Công việc tự động tính % khối lượng đảm nhận và tiến độ hoàn thành từng cá nhân.</p>
+          </div>
+
+          <div class="card accent-left-indigo">
+            <h3>3. Xóa bỏ độ trễ thông tin khi cộng tác từ xa</h3>
+            <p>Các công cụ bảng tính tĩnh bắt buộc thành viên phải hỏi thủ công hoặc nhấn tải lại trang (F5) liên tục mới biết trạng thái công việc mới.</p>
+            <p style="margin-top:8px;font-weight:700;color:var(--accent);">➔ Tích hợp WebSocket đẩy thông báo lời mời và chuyển động kéo thả thẻ tức thì sang mọi màn hình.</p>
+          </div>
+
+          <div class="card accent-left-green">
+            <h3>4. Bao quát trọn vẹn kiến thức Kỹ thuật Phần mềm</h3>
+            <p>Đề tài hội tụ các bài toán thực tế có chiều sâu: thiết kế ERD chuẩn hóa 3NF, xác thực Google OAuth2/JWT, phân quyền RBAC 4 cấp và kiểm thử tự động.</p>
+            <p style="margin-top:8px;font-weight:700;color:var(--accent);">➔ Giúp cả 5 thành viên rèn luyện quy trình phát triển sản phẩm hoàn chỉnh từ CSDL đến Cloud.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: PHẦN 2.2 — MÔ TẢ CHỨC NĂNG SẢN PHẨM & RBAC -->
+    <section class="slide" data-speaker="Lê Minh Sơn (3:30 – 5:00)" data-notes="Về mô tả chức năng sản phẩm: Hệ thống gồm 6 phân hệ nghiệp vụ khép kín từ xác thực Google OAuth2, quản lý vòng đời Lưu trữ/Khôi phục dự án, lời mời thông báo tức thì, bảng Kanban kéo thả không nháy đến thống kê thành viên và phân quyền 4 vai trò.">
+      <div class="slide-inner">
+        <div class="stagger d-1">
+          <div class="eyebrow-row"><span class="pill">04 / 08</span><span class="eyebrow-text">Phần 2.2 · Mô tả sản phẩm — Chức năng &amp; Phân quyền</span></div>
+          <h2 class="slide-title" style="margin-top:6px;">6 Phân Hệ Chức Năng Chính &amp; Cơ Chế Phân Quyền Dự Án (RBAC)</h2>
+        </div>
+
+        <div class="grid-3 stagger d-2">
+          <div class="card accent-left-indigo">
+            <h3>1. Xác thực &amp; Quản trị Tài khoản</h3>
+            <p>Đăng nhập JWT &amp; Google OAuth 2.0, tự động gia hạn Refresh Token, đổi mật khẩu thu hồi phiên cũ và trang Admin khóa/mở khóa người dùng.</p>
+          </div>
+          <div class="card accent-left-green">
+            <h3>2. Quản lý Dự án &amp; Tìm kiếm Phím tắt</h3>
+            <p>Tự sinh 3 cột mặc định; hỗ trợ Lưu trữ chỉ đọc kèm 2 nút <strong>Khôi phục / Xoá</strong>; nhấn phím <code>/</code> dùng mũi tên <code>↑ ↓</code> tìm nhanh toàn cục.</p>
+          </div>
+          <div class="card accent-left-amber">
+            <h3>3. Lời mời &amp; Thông báo Realtime</h3>
+            <p>Mời qua email băm SHA-256; người nhận nổi ngay Toast thông báo và tăng số chuông mà không cần tải lại trang.</p>
+          </div>
+          <div class="card accent-left-violet">
+            <h3>4. Bảng Kanban Kéo thả Không nháy</h3>
+            <p>Tùy biến thêm/sửa/kéo thả cột, đánh dấu Cột Hoàn thành; kéo thả thẻ mượt 0ms và đồng bộ trực tiếp sang màn hình thành viên khác.</p>
+          </div>
+          <div class="card accent-left-indigo">
+            <h3>5. Hồ sơ Công việc 360° &amp; Thùng rác</h3>
+            <p>Độ ưu tiên, hạn chót, giao nhiều người, nhãn màu, Checklist tự tính %, bình luận, đính kèm tệp (kiểm tra Magic Bytes) &amp; Thùng rác.</p>
+          </div>
+          <div class="card accent-left-red">
+            <h3>6. Thống kê Thành viên &amp; Nhật ký</h3>
+            <p>Tab Thống kê đo tỷ lệ % khối lượng dự án và hoàn thành của từng thành viên; Nhật ký lưu vết mọi thay đổi dạng JSON.</p>
+          </div>
+        </div>
+
+        <div class="grid-4 stagger d-3">
+          <div class="card" style="background:#0f172a;color:#fff;"><strong style="color:#34d399;">OWNER</strong><p style="color:#cbd5e1;font-size:12.5px;margin-top:4px;">Toàn quyền dự án, chuyển quyền Owner, lưu trữ, khôi phục &amp; xóa dự án.</p></div>
+          <div class="card" style="background:#0f172a;color:#fff;"><strong style="color:#818cf8;">MANAGER</strong><p style="color:#cbd5e1;font-size:12.5px;margin-top:4px;">Quản lý cột Kanban, mời Member/Viewer, điều phối việc &amp; Thùng rác.</p></div>
+          <div class="card" style="background:#0f172a;color:#fff;"><strong style="color:#fbbf24;">MEMBER</strong><p style="color:#cbd5e1;font-size:12.5px;margin-top:4px;">Tạo, sửa, kéo thả công việc, nhận giao việc, checklist, bình luận &amp; tệp.</p></div>
+          <div class="card" style="background:#0f172a;color:#fff;"><strong style="color:#94a3b8;">VIEWER</strong><p style="color:#cbd5e1;font-size:12.5px;margin-top:4px;">Chế độ chỉ xem tiến độ &amp; thống kê, không chỉnh sửa hay nhận việc.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 5: PHẦN 2.3 — SƠ ĐỒ THỰC THỂ LIÊN KẾT (ERD) -->
+    <section class="slide" data-speaker="Hà Đức Minh (5:00 – 6:45)" data-notes="Tiếp theo em Hà Đức Minh xin trình bày Sơ đồ Thực thể Liên kết (ERD) của hệ thống gồm 16 bảng MySQL InnoDB. Trung tâm của sơ đồ là thực thể projects, lists và tasks kết nối với phân hệ định danh bên trái và phân hệ cộng tác, kiểm vết bên phải.">
+      <div class="slide-inner">
+        <div class="stagger d-1">
+          <div class="eyebrow-row">
+            <span class="pill">05 / 08</span>
+            <span class="eyebrow-text">Phần 2.3 · Mô tả sản phẩm — Sơ đồ thực thể liên kết (ERD)</span>
+            <a href="assets/images/erd-diagram.svg" target="_blank" class="pill" style="text-decoration:none;margin-left:auto;">🔍 Mở ảnh ERD kích thước gốc ↗</a>
+          </div>
+          <h2 class="slide-title" style="margin-top:4px;">Sơ Đồ Thực Thể Liên Kết (ERD) — 16 Bảng MySQL 8.0 Chuẩn Hóa</h2>
+        </div>
+
+        <div class="erd-frame stagger d-2">
+          <img src="assets/images/erd-diagram.svg" alt="Sơ đồ ERD 16 bảng của hệ thống Agile Workspace">
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: PHẦN 2.3 (TIẾP) — GIẢI THÍCH CÁC QUAN HỆ & RÀNG BUỘC ERD -->
+    <section class="slide" data-speaker="Hà Đức Minh (6:45 – 8:00)" data-notes="Đi sâu vào thiết kế ERD, nhóm áp dụng 4 kỹ thuật đảm bảo toàn vẹn dữ liệu quan trọng ngay ở tầng MySQL: tách 3 bảng trung gian N-N chuẩn 3NF, khóa ngoại kép giữa tasks và lists, cột ảo chống gửi trùng lời mời và cơ chế xóa mềm kết hợp kiểm vết JSON.">
+      <div class="slide-inner">
+        <div class="stagger d-1">
+          <div class="eyebrow-row"><span class="pill">06 / 08</span><span class="eyebrow-text">Phần 2.3 · Phân tích thiết kế CSDL &amp; Ràng buộc toàn vẹn</span></div>
+          <h2 class="slide-title" style="margin-top:6px;">4 Điểm Sáng Kỹ Thuật Trong Thiết Kế ERD &amp; Ràng Buộc MySQL</h2>
+        </div>
+
+        <div class="grid-2 stagger d-2">
+          <div class="card accent-left-indigo">
+            <h3>1. Chuẩn hóa Quan hệ Nhiều – Nhiều (N : N) đạt 3NF</h3>
+            <ul>
+              <li><code>project_members(project_id, user_id)</code>: Liên kết thành viên vào dự án kèm vai trò <code>role</code>.</li>
+              <li><code>task_assignees(task_id, user_id)</code>: Cho phép phân công nhiều người cùng thực hiện 1 công việc.</li>
+              <li><code>task_labels(task_id, label_id)</code>: Gắn linh hoạt nhiều nhãn màu phân loại trên từng thẻ việc.</li>
+            </ul>
+          </div>
+
+          <div class="card accent-left-green">
+            <h3>2. Khóa Ngoại Kép (Composite Foreign Key) Chống Lệch Dự Án</h3>
+            <ul>
+              <li>Bảng <code>lists</code> khai báo khóa duy nhất kép <code>UNIQUE (id, project_id)</code>.</li>
+              <li>Bảng <code>tasks</code> tham chiếu đồng thời <code>(list_id, project_id) -&gt; lists(id, project_id)</code>.</li>
+              <li>Ngăn chặn tuyệt đối rủi ro gắn nhầm công việc của Dự án A sang cột Kanban của Dự án B.</li>
+            </ul>
+          </div>
+
+          <div class="card accent-left-amber">
+            <h3>3. Cột Ảo Sinh Tự Động (Virtual Generated Column)</h3>
+            <ul>
+              <li>Bảng <code>project_invitations</code> sử dụng cột ảo <code>pending_email</code> chỉ sinh giá trị khi <code>status = 'pending'</code>.</li>
+              <li>Kết hợp <code>UNIQUE (project_id, pending_email)</code> chặn tuyệt đối 2 lời mời trùng email đang chờ ở tầng DB, nhưng vẫn cho phép mời lại nếu lời mời cũ đã hết hạn/hủy.</li>
+            </ul>
+          </div>
+
+          <div class="card accent-left-violet">
+            <h3>4. Tự Tham chiếu Đệ quy, Xóa mềm &amp; Kiểm vết JSON</h3>
+            <ul>
+              <li><code>comments.parent_id -&gt; comments.id</code> hỗ trợ cấu trúc bình luận phản hồi đa cấp.</li>
+              <li>Cột <code>deleted_at</code> / <code>is_deleted</code> bảo toàn khóa ngoại lịch sử khi lưu trữ dự án hoặc đưa việc vào Thùng rác.</li>
+              <li><code>activity_logs</code> lưu cặp <code>old_value</code> &amp; <code>new_value</code> kiểu <code>JSON</code> phục vụ kiểm toán.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 7: PHẦN 2.4 — ĐIỂM HẠN CHẾ & HƯỚNG PHÁT TRIỂN TƯƠNG LAI -->
+    <section class="slide" data-speaker="Nguyễn Tấn Dũng (8:00 – 9:15)" data-notes="Ở mục cuối của phần mô tả sản phẩm, em Nguyễn Tấn Dũng xin đánh giá thẳng thắn 4 điểm hạn chế hiện tại của đồ án và đề xuất lộ trình nâng cấp tương ứng trong tương lai để hoàn thiện sản phẩm ở quy mô lớn hơn.">
+      <div class="slide-inner">
+        <div class="stagger d-1">
+          <div class="eyebrow-row"><span class="pill">07 / 08</span><span class="eyebrow-text">Phần 2.4 · Mô tả sản phẩm — Đánh giá &amp; Mở rộng</span></div>
+          <h2 class="slide-title" style="margin-top:6px;">Điểm Hạn Chế Hiện Tại &amp; Hướng Phát Triển Trong Tương Lai</h2>
+        </div>
+
+        <div class="grid-2">
+          <div class="card stagger d-2" style="background:#fffafa;border-color:#fecaca;">
+            <span class="pill" style="background:#fef2f2;color:#b91c1c;border-color:#fecaca;margin-bottom:12px;">ĐIỂM HẠN CHẾ HIỆN TẠI</span>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div class="card accent-left-red"><h3>1. Chưa gửi Email SMTP tự động ra ngoài</h3><p>Với người chưa có tài khoản trên hệ thống, người mời cần sao chép liên kết lời mời thủ công thay vì tự động nhận thư qua hộp mail.</p></div>
+              <div class="card accent-left-red"><h3>2. Tệp đính kèm còn lưu trên ổ đĩa máy chủ cục bộ</h3><p>Đang giới hạn 10MB/tệp trên thư mục máy chủ, chưa tối ưu khi triển khai phân tán nhiều container Serverless.</p></div>
+              <div class="card accent-left-red"><h3>3. Chưa có góc nhìn Biểu đồ Gantt &amp; Lịch biểu</h3><p>Mới tập trung vào Bảng Kanban, Danh sách bảng và Thống kê thành viên; thiếu biểu đồ đường găng theo tháng/quý.</p></div>
+              <div class="card accent-left-red"><h3>4. WebSocket quản lý trong RAM đơn tiến trình</h3><p>Phù hợp quy mô vừa và nhỏ; khi mở rộng hàng chục máy chủ song song sẽ cần thêm tầng đồng bộ tin nhắn trung gian.</p></div>
+            </div>
+          </div>
+
+          <div class="card stagger d-3" style="background:#f6fef9;border-color:#a7f3d0;">
+            <span class="pill" style="background:#ecfdf5;color:#047857;border-color:#a7f3d0;margin-bottom:12px;">HƯỚNG PHÁT TRIỂN TRONG TƯƠNG LAI</span>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <div class="card accent-left-green"><h3>1. Tích hợp SendGrid Email &amp; Nhắc hạn Tự động</h3><p>Tự động gửi email kèm nút Chấp nhận lời mời và chạy tác vụ nền (Celery/Cron) nhắc việc sắp đến hạn trước 24 giờ.</p></div>
+              <div class="card accent-left-green"><h3>2. Lưu trữ Đám mây AWS S3 / Cloudinary</h3><p>Đưa toàn bộ tệp đính kèm lên Object Storage có CDN tốc độ cao và hỗ trợ xem trước trực tiếp PDF/Ảnh ngay trên thẻ.</p></div>
+              <div class="card accent-left-green"><h3>3. Bổ sung Gantt Chart, Google Calendar &amp; App Mobile</h3><p>Trực quan hóa tiến độ dài hạn, đồng bộ lịch cá nhân và phát triển ứng dụng di động nhận thông báo đẩy (Push Notification).</p></div>
+              <div class="card accent-left-green"><h3>4. Mở rộng Redis Pub/Sub &amp; Trợ lý AI Agile</h3><p>Đồng bộ WebSocket đa cụm máy chủ qua Redis; tích hợp AI tự động gợi ý chia nhỏ Checklist từ mô tả công việc.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 8: LIVE DEMO & VẤN ĐÁP -->
+    <section class="slide slide-dark" data-speaker="Nguyễn Tấn Dũng & Cả nhóm (9:15 – 10:00)" data-notes="Trên đây là toàn bộ phần giới thiệu và mô tả chi tiết sản phẩm Agile Workspace. Ngay bây giờ nhóm xin phép chuyển sang phần trình diễn Live Demo trực tiếp trên hệ thống và rất mong nhận được ý kiến đóng góp từ thầy Nguyễn Hữu Minh Dương cùng các bạn!">
+      <div class="slide-inner">
+        <div class="stagger d-1">
+          <div class="eyebrow-row"><span class="pill">08 / 08</span><span class="eyebrow-text">Phần 3 · Trình diễn thực tế &amp; Thảo luận</span></div>
+          <h2 class="slide-title" style="margin-top:6px;">Trình Diễn Sản Phẩm Thực Tế (Live Demo) &amp; Vấn Đáp (Q&amp;A)</h2>
+        </div>
+
+        <div class="grid-4 stagger d-2">
+          <div class="card card-dark"><strong style="color:#818cf8;font-size:13px;">BƯỚC DEMO 1</strong><h3 style="margin-top:6px;">Đăng nhập &amp; Tìm kiếm Phím <code>/</code></h3><p style="margin-top:4px;">Trải nghiệm Dashboard, điều hướng bàn phím <code>↑ ↓</code> và Lưu trữ / Khôi phục dự án.</p></div>
+          <div class="card card-dark"><strong style="color:#34d399;font-size:13px;">BƯỚC DEMO 2</strong><h3 style="margin-top:6px;">Lời mời Dự án Realtime</h3><p style="margin-top:4px;">Gửi lời mời ở màn hình A — Màn hình B nổi thông báo tức thì không cần tải lại trang.</p></div>
+          <div class="card card-dark"><strong style="color:#fbbf24;font-size:13px;">BƯỚC DEMO 3</strong><h3 style="margin-top:6px;">Kéo thả Kanban Realtime</h3><p style="margin-top:4px;">Kéo thẻ công việc sang cột Hoàn thành và quan sát đồng bộ trực tiếp giữa 2 cửa sổ.</p></div>
+          <div class="card card-dark"><strong style="color:#f472b6;font-size:13px;">BƯỚC DEMO 4</strong><h3 style="margin-top:6px;">Thống kê Tỷ lệ Thành viên</h3><p style="margin-top:4px;">Kiểm tra tỷ lệ % đóng góp của từng cá nhân trong dự án &amp; Nhật ký hoạt động.</p></div>
+        </div>
+
+        <div class="card card-dark stagger d-3" style="text-align:center;padding:28px 32px;">
+          <h3 style="font-size:24px;justify-content:center;">XIN TRÂN TRỌNG CẢM ƠN THẦY NGUYỄN HỮU MINH DƯƠNG VÀ CÁC BẠN!</h3>
+          <p style="margin-top:8px;font-size:15px;color:#c7d2fe;">
+            Nhóm thực hiện: <strong>Nghiêm Đình Bình</strong> (Nhóm trưởng) · <strong>Nguyễn Quý Dũng</strong> · <strong>Lê Minh Sơn</strong> · <strong>Hà Đức Minh</strong> · <strong>Nguyễn Tấn Dũng</strong>
+          </p>
+          <div style="margin-top:18px;">
+            <a class="dock-btn primary" style="display:inline-block;padding:12px 24px;font-size:14.5px;" href="index.html" target="_blank">🚀 Mở Ngay Giao Diện Live Demo →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside id="notes-drawer" class="notes-drawer" aria-live="polite">
+    <h4 id="notes-speaker">Người trình bày</h4>
+    <p id="notes-content"></p>
+  </aside>
+
+  <nav class="deck-dock" aria-label="Điều khiển trình chiếu">
+    <button class="dock-btn" type="button" id="prev-btn">← Trước</button>
+    <span class="dock-counter" id="slide-counter">01 / 08</span>
+    <button class="dock-btn primary" type="button" id="next-btn">Tiếp →</button>
+    <span class="dock-timer" id="timer-btn" title="Nhấn để Bắt đầu / Tạm dừng đồng hồ 10 phút">⏱ 10:00</span>
+    <button class="dock-btn" type="button" id="notes-btn">Lời dẫn (N)</button>
+    <button class="dock-btn" type="button" id="fs-btn">Toàn màn hình (F)</button>
+    <a class="dock-btn" href="index.html" target="_blank">Live Demo ↗</a>
+  </nav>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll(".slide"));
+    const counterEl = document.getElementById("slide-counter");
+    const progressEl = document.getElementById("progress-bar");
+    const notesDrawer = document.getElementById("notes-drawer");
+    const notesSpeaker = document.getElementById("notes-speaker");
+    const notesContent = document.getElementById("notes-content");
+    const timerBtn = document.getElementById("timer-btn");
+
+    let current = 0;
+    let remainingSec = 600;
+    let timerId = null;
+
+    function goToSlide(index) {
+      current = Math.max(0, Math.min(slides.length - 1, index));
+      slides.forEach((sl, idx) => {
+        sl.classList.remove("is-active", "is-prev");
+        if (idx === current) sl.classList.add("is-active");
+        else if (idx < current) sl.classList.add("is-prev");
+      });
+      counterEl.textContent = `${String(current + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
+      progressEl.style.width = `${((current + 1) / slides.length) * 100}%`;
+      notesSpeaker.textContent = `🎙 ${slides[current].dataset.speaker || ""}`;
+      notesContent.textContent = slides[current].dataset.notes || "";
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+      else document.exitFullscreen?.();
+    }
+
+    function toggleTimer() {
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+        return;
+      }
+      timerId = setInterval(() => {
+        if (remainingSec > 0) remainingSec -= 1;
+        const m = String(Math.floor(remainingSec / 60)).padStart(2, "0");
+        const s = String(remainingSec % 60).padStart(2, "0");
+        timerBtn.textContent = `⏱ ${m}:${s}`;
+        if (remainingSec <= 60) timerBtn.style.color = "#fca5a5";
+      }, 1000);
+    }
+
+    document.getElementById("prev-btn").addEventListener("click", () => goToSlide(current - 1));
+    document.getElementById("next-btn").addEventListener("click", () => goToSlide(current + 1));
+    document.getElementById("notes-btn").addEventListener("click", () => notesDrawer.classList.toggle("open"));
+    document.getElementById("fs-btn").addEventListener("click", toggleFullscreen);
+    timerBtn.addEventListener("click", toggleTimer);
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") {
+        e.preventDefault();
+        goToSlide(current + 1);
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        e.preventDefault();
+        goToSlide(current - 1);
+      } else if (e.key === "Home") {
+        goToSlide(0);
+      } else if (e.key === "End") {
+        goToSlide(slides.length - 1);
+      } else if (e.key === "n" || e.key === "N") {
+        notesDrawer.classList.toggle("open");
+      } else if (e.key === "f" || e.key === "F") {
+        toggleFullscreen();
+      }
+    });
+
+    goToSlide(0);
+  </script>
+</body>
+
+</html>
