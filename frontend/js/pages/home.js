@@ -96,7 +96,7 @@ function renderProjects() {
   projectCards.innerHTML = visibleProjects.map((project, index) => {
     const canManage = ["owner", "manager"].includes(project.user_role);
     const canDelete = project.user_role === "owner";
-    const canEdit = canManage && project.status === "active";
+    const isArchived = project.status === "archived";
     const color = ["teal", "amber", "violet", "emerald"][index % 4];
     const rate = Math.round(project.completion_rate || 0);
     return `<article class="project-card project-entry">
@@ -123,8 +123,13 @@ function renderProjects() {
       <div class="project-card-bottom">
         <span style="display:inline-flex;align-items:center;gap:5px;">${iconSvg("users")} <span>${project.member_count} thành viên</span></span>
         <span class="project-card-actions">
-          ${canManage ? `<button class="btn btn-small" type="button" data-action="edit" data-project-id="${project.id}" ${canEdit ? "" : "disabled"}>Chỉnh sửa</button>` : ""}
-          ${canDelete ? `<button class="btn btn-small btn-danger" type="button" data-action="delete" data-project-id="${project.id}">Lưu trữ</button>` : ""}
+          ${isArchived ? `
+            ${canManage ? `<button class="btn btn-small btn-primary" type="button" data-action="unarchive" data-project-id="${project.id}">Khôi phục</button>` : ""}
+            ${canDelete ? `<button class="btn btn-small btn-danger" type="button" data-action="delete" data-project-id="${project.id}">Xoá</button>` : ""}
+          ` : `
+            ${canManage ? `<button class="btn btn-small" type="button" data-action="edit" data-project-id="${project.id}">Chỉnh sửa</button>` : ""}
+            ${canManage ? `<button class="btn btn-small btn-danger" type="button" data-action="archive" data-project-id="${project.id}">Lưu trữ</button>` : ""}
+          `}
         </span>
       </div>
     </article>`;
@@ -199,6 +204,9 @@ async function loadDashboard() {
     renderProjects();
     renderWorkspaceHealth();
     renderUpcomingTasks(myTasks);
+    if (typeof renderLayout === "function") {
+      renderLayout(projects, user);
+    }
 
     if (user.system_role === "admin") {
       const adminOverview = document.getElementById("admin-overview");
@@ -243,18 +251,43 @@ document.getElementById("project-cards")?.addEventListener("click", async (event
   const project = projects.find((item) => item.id === id);
   if (!project) return;
   if (button.dataset.action === "edit") openProjectForm(project);
-  if (button.dataset.action === "delete") {
+  if (button.dataset.action === "archive") {
     const ok = await showConfirmModal({
       eyebrow: "LƯU TRỮ DỰ ÁN",
       title: `Lưu trữ "${project.name}"?`,
-      message: "Dự án sẽ được chuyển vào trạng thái lưu trữ. Bạn có thể xem lại bất cứ lúc nào.",
+      message: "Dự án sẽ được chuyển sang trạng thái Đã lưu trữ (chỉ đọc). Bạn vẫn xem lại và khôi phục được bất cứ lúc nào.",
       confirmText: "Lưu trữ dự án",
+    });
+    if (!ok) return;
+    try {
+      await api.put(`/projects/${id}`, { status: "archived" });
+      showToast("Đã chuyển dự án sang trạng thái Đã lưu trữ");
+      await loadDashboard();
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  }
+  if (button.dataset.action === "unarchive") {
+    try {
+      await api.put(`/projects/${id}`, { status: "active" });
+      showToast(`Đã khôi phục dự án "${project.name}" sang Đang hoạt động`);
+      await loadDashboard();
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  }
+  if (button.dataset.action === "delete") {
+    const ok = await showConfirmModal({
+      eyebrow: "XOÁ DỰ ÁN",
+      title: `Xoá dự án "${project.name}"?`,
+      message: "Dự án này sẽ bị gỡ khỏi danh sách không gian làm việc của bạn. Bạn có chắc chắn muốn xoá không?",
+      confirmText: "Xoá dự án",
       danger: true,
     });
     if (!ok) return;
     try {
       await api.delete(`/projects/${id}`);
-      showToast("Đã chuyển dự án vào lưu trữ");
+      showToast("Đã xoá dự án");
       await loadDashboard();
     } catch (error) {
       showToast(error.message, "error");

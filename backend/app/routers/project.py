@@ -153,6 +153,23 @@ def list_my_projects_summary(
     current_user: User = Depends(get_current_user),
 ):
     """Danh sách dự án của người dùng hiện tại kèm thống kê số thành viên, tiến độ công việc và vai trò"""
+    # Tự động khôi phục các dự án bị nút "Lưu trữ" cũ gọi nhầm xoá mềm (deleted_at != NULL khi status != 'archived')
+    accidentally_deleted = (
+        db.query(Project)
+        .join(ProjectMember, ProjectMember.project_id == Project.id)
+        .filter(
+            ProjectMember.user_id == current_user.id,
+            Project.deleted_at.isnot(None),
+            Project.status != "archived",
+        )
+        .all()
+    )
+    if accidentally_deleted:
+        for p in accidentally_deleted:
+            p.deleted_at = None
+            p.status = "archived"
+        db.commit()
+
     rows = (
         db.query(Project, ProjectMember.role)
         .join(ProjectMember, ProjectMember.project_id == Project.id)
@@ -229,12 +246,20 @@ def get_project_board(
         .order_by(ListModel.position.asc(), ListModel.id.asc())
         .all()
     )
+    done_list_ids = {lst.id for lst in lists if lst.is_done_column}
     tasks = (
         db.query(Task)
         .filter(Task.project_id == project_id, Task.is_deleted.is_(False))
         .order_by(Task.position.asc(), Task.id.asc())
         .all()
     )
+    dirty = False
+    for t in tasks:
+        if t.list_id not in done_list_ids and t.completed_at is not None:
+            t.completed_at = None
+            dirty = True
+    if dirty:
+        db.commit()
     return ProjectBoardResponse(
         lists=[ListResponse.model_validate(lst) for lst in lists],
         tasks=[_build_task_detail_response(db, t) for t in tasks],
@@ -257,7 +282,10 @@ def update_project(
     # Dự án completed/archived là chỉ đọc: chỉ cho phép đổi trạng thái.
     # Muốn sửa các trường khác phải mở lại 'active' (có thể gửi kèm trong cùng request).
     if project.status in ("completed", "archived") and update_data.get("status") != "active":
-        non_status_fields = {k for k in update_data.keys() if k != "status"}
+        non_status_fields = {
+            k for k, v in update_data.items()
+            if k != "status" and getattr(project, k, None) != v
+        }
         if non_status_fields:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -292,6 +320,7 @@ def soft_delete_project(
     ),
 ):
     project, _ = data
+    project.status = "archived"
     project.deleted_at = func.now()
     db.commit()
     return None
@@ -334,11 +363,16 @@ def create_list(
     is_done = bool(list_in.is_done_column)
 
     if is_done:
-        # Đảm bảo mỗi dự án chỉ có đúng 1 cột hoàn thành
+        # Đảm bảo mỗi dự án chỉ có đúng 1 cột hoàn thành và xoá completed_at ở các cột cũ
         db.query(ListModel).filter(
             ListModel.project_id == project_id,
             ListModel.is_done_column.is_(True),
         ).update({ListModel.is_done_column: False}, synchronize_session=False)
+        db.query(Task).filter(
+            Task.project_id == project_id,
+            Task.is_deleted.is_(False),
+            Task.completed_at.isnot(None),
+        ).update({Task.completed_at: None}, synchronize_session=False)
 
     target_pos = list_in.position if list_in.position is not None else len(existing_lists)
     target_pos = max(0, min(target_pos, len(existing_lists)))
@@ -423,24 +457,17 @@ def update_list(
 
     update_data = list_update.model_dump(exclude_unset=True)
 
-    # Xử lý đánh dấu cột hoàn thành (mỗi dự án đúng một cột is_done_column)
-    if "is_done_column" in update_data:
-        new_is_done = update_data["is_done_column"]
+    # Xử lý đánh dấu / bỏ đánh dấu cột hoàn thành và đồng bộ completed_at của các task
+    if "is_done_column" in update_data and update_data["is_done_column"] is not None:
+        new_is_done = bool(update_data["is_done_column"])
         if new_is_done is False and lst.is_done_column:
-            other_done = (
-                db.query(ListModel)
-                .filter(
-                    ListModel.project_id == project_id,
-                    ListModel.id != list_id,
-                    ListModel.is_done_column.is_(True),
-                )
-                .first()
-            )
-            if not other_done:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Mỗi dự án phải có đúng một cột hoàn thành. Hãy đặt cột khác làm cột hoàn thành trước.",
-                )
+            lst.is_done_column = False
+            # Khi bỏ tick cột hoàn thành -> xoá trạng thái completed_at của các task trong cột này
+            db.query(Task).filter(
+                Task.list_id == list_id,
+                Task.is_deleted.is_(False),
+                Task.completed_at.isnot(None),
+            ).update({Task.completed_at: None}, synchronize_session=False)
         elif new_is_done is True and not lst.is_done_column:
             db.query(ListModel).filter(
                 ListModel.project_id == project_id,
@@ -448,6 +475,13 @@ def update_list(
                 ListModel.is_done_column.is_(True),
             ).update({ListModel.is_done_column: False}, synchronize_session=False)
             lst.is_done_column = True
+            # Xoá completed_at của các task nằm ở các cột không còn là cột hoàn thành
+            db.query(Task).filter(
+                Task.project_id == project_id,
+                Task.list_id != list_id,
+                Task.is_deleted.is_(False),
+                Task.completed_at.isnot(None),
+            ).update({Task.completed_at: None}, synchronize_session=False)
             # Tự cập nhật completed_at cho các task đang ở trong cột hoàn thành mới này
             now = datetime.now(timezone.utc)
             db.query(Task).filter(
