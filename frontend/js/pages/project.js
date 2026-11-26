@@ -242,8 +242,11 @@ function renderBoard() {
       <button type="button" class="column-action" data-list-action="delete" data-list-id="${list.id}" title="Xoá cột" aria-label="Xoá cột">${iconSvg("trash")}</button>
     </span>` : "";
     const addTask = canEdit ? `<button type="button" class="add-task" data-create-task="${list.id}">${iconSvg("plus")} <span>Thêm công việc vào cột này</span></button>` : "";
+    const gripHandle = canManageLists
+      ? `<span class="column-grip" title="Giữ và kéo để đổi vị trí cột" aria-hidden="true">${iconSvg("grip")}</span>`
+      : "";
     return `<section class="board-column${list.is_done_column ? " board-column-done" : ""}" data-list-id="${list.id}" aria-label="${escapeHtml(list.name)}" draggable="${canManageLists}">
-      <div class="column-title" ${canManageLists ? 'data-list-drag-handle="true"' : ""}><span class="column-dot${list.is_done_column ? " done-dot" : ""}"></span><strong>${escapeHtml(list.name)}</strong><span class="count">${tasks.length}</span>${listActions}</div>
+      <div class="column-title" ${canManageLists ? 'data-list-drag-handle="true" title="Giữ tiêu đề cột và kéo sang trái/phải để đổi thứ tự"' : ""}>${gripHandle}<span class="column-dot${list.is_done_column ? " done-dot" : ""}"></span><strong>${escapeHtml(list.name)}</strong><span class="count">${tasks.length}</span>${listActions}</div>
       <div class="column-tasks">${content}</div>${addTask}
     </section>`;
   }).join("") + (canManageLists ? `<button type="button" id="add-list-button" class="add-list">${iconSvg("plus")} <span>Thêm cột trạng thái mới</span></button>` : "");
@@ -1767,47 +1770,89 @@ boardElement.addEventListener("keydown", (event) => {
 let draggedTask = null;
 let draggedListId = null;
 let activeDropColumn = null;
+let canStartColumnDrag = false;
+let columnDropSide = "before"; // "before" | "after"
+
+function updateColumnDragEligibility(event) {
+  canStartColumnDrag = Boolean(
+    canManageLists
+    && event.target.closest("[data-list-drag-handle]")
+    && !event.target.closest(".column-actions, button, .task-card"),
+  );
+}
+
+boardElement.addEventListener("pointerdown", updateColumnDragEligibility);
+boardElement.addEventListener("mousedown", updateColumnDragEligibility);
 
 function clearDropTargetHighlight() {
   if (activeDropColumn) {
-    activeDropColumn.classList.remove("drop-target");
+    activeDropColumn.classList.remove("drop-target", "drop-column-before", "drop-column-after");
     activeDropColumn = null;
   }
-  boardElement.querySelectorAll(".drop-target").forEach((el) => el.classList.remove("drop-target"));
+  boardElement.querySelectorAll(".drop-target, .drop-column-before, .drop-column-after").forEach((el) => {
+    el.classList.remove("drop-target", "drop-column-before", "drop-column-after");
+  });
 }
 
 boardElement.addEventListener("dragstart", (event) => {
   const task = event.target.closest(".task-card");
   const column = event.target.closest(".board-column");
   if (task && canEdit) {
+    canStartColumnDrag = false;
+    draggedListId = null;
     draggedTask = boardData.tasks.find((item) => item.id === Number(task.dataset.taskId));
     event.dataTransfer.setData("text/task-id", String(task.dataset.taskId));
     event.dataTransfer.effectAllowed = "move";
     requestAnimationFrame(() => task.classList.add("dragging"));
-  } else if (column && canManageLists && event.target.closest("[data-list-drag-handle]")) {
+  } else if (column && canManageLists && canStartColumnDrag) {
+    draggedTask = null;
     draggedListId = Number(column.dataset.listId);
     event.dataTransfer.setData("text/list-id", String(draggedListId));
     event.dataTransfer.effectAllowed = "move";
+    requestAnimationFrame(() => column.classList.add("dragging-column"));
   } else {
     event.preventDefault();
   }
 });
 
 boardElement.addEventListener("dragend", () => {
-  boardElement.querySelectorAll(".dragging").forEach((element) => element.classList.remove("dragging"));
+  boardElement.querySelectorAll(".dragging, .dragging-column").forEach((element) => {
+    element.classList.remove("dragging", "dragging-column");
+  });
   clearDropTargetHighlight();
   draggedTask = null;
   draggedListId = null;
+  canStartColumnDrag = false;
 });
 
 boardElement.addEventListener("dragover", (event) => {
   const column = event.target.closest(".board-column");
-  if (column && (draggedTask || draggedListId)) {
+  if (!column) return;
+
+  if (draggedTask && canEdit) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     if (activeDropColumn !== column) {
-      if (activeDropColumn) activeDropColumn.classList.remove("drop-target");
+      clearDropTargetHighlight();
       column.classList.add("drop-target");
+      activeDropColumn = column;
+    }
+    return;
+  }
+
+  if (draggedListId && canManageLists) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    if (Number(column.dataset.listId) === draggedListId) {
+      clearDropTargetHighlight();
+      return;
+    }
+    const rect = column.getBoundingClientRect();
+    const nextSide = event.clientX < rect.left + rect.width / 2 ? "before" : "after";
+    if (activeDropColumn !== column || columnDropSide !== nextSide) {
+      clearDropTargetHighlight();
+      columnDropSide = nextSide;
+      column.classList.add(nextSide === "before" ? "drop-column-before" : "drop-column-after");
       activeDropColumn = column;
     }
   }
@@ -1873,21 +1918,38 @@ boardElement.addEventListener("drop", async (event) => {
 
   if (draggedListId && canManageLists) {
     const movingListId = draggedListId;
+    const dropSide = columnDropSide;
     draggedListId = null;
-    const from = boardData.lists.findIndex((list) => list.id === movingListId);
-    const to = boardData.lists.findIndex((list) => list.id === Number(column.dataset.listId));
-    if (from < 0 || to < 0 || from === to) return;
+    canStartColumnDrag = false;
+    const targetColId = Number(column.dataset.listId);
+    if (!targetColId || movingListId === targetColId) return;
 
+    boardData.lists.sort((a, b) => a.position - b.position || a.id - b.id);
     const previous = boardData.lists.map((item) => ({ ...item }));
-    const [list] = boardData.lists.splice(from, 1);
-    boardData.lists.splice(to, 0, list);
+    const from = boardData.lists.findIndex((list) => list.id === movingListId);
+    if (from < 0) return;
+
+    const [movingList] = boardData.lists.splice(from, 1);
+    const targetIdxAfterRemove = boardData.lists.findIndex((list) => list.id === targetColId);
+    if (targetIdxAfterRemove < 0) {
+      boardData.lists = previous;
+      return;
+    }
+
+    const insertIdx = dropSide === "after" ? targetIdxAfterRemove + 1 : targetIdxAfterRemove;
+    boardData.lists.splice(insertIdx, 0, movingList);
     boardData.lists.forEach((item, index) => { item.position = index; });
     renderBoard();
 
     try {
-      await api.patch(`/projects/${projectId}/lists/reorder`, {
+      const reordered = await api.patch(`/projects/${projectId}/lists/reorder`, {
         list_ids: boardData.lists.map((item) => item.id),
       });
+      if (Array.isArray(reordered)) {
+        boardData.lists = reordered;
+        renderBoard();
+      }
+      broadcastLocalBoardEvent("list_reordered", boardData.lists);
     } catch (error) {
       boardData.lists = previous;
       renderBoard();
@@ -1989,13 +2051,20 @@ function handleProjectRealtimeMessage(payload) {
     return;
   }
 
+  if (event === "list_reordered" && Array.isArray(data)) {
+    if (!draggedListId) {
+      boardData.lists = data;
+      renderBoard();
+    }
+    return;
+  }
+
   if (
     event === "task_restored"
     || event === "task_reordered"
     || event === "list_created"
     || event === "list_updated"
     || event === "list_deleted"
-    || event === "list_reordered"
   ) {
     scheduleSilentBoardSync(80);
     return;
