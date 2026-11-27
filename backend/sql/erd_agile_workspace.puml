@@ -1,0 +1,298 @@
+@startuml Agile_Workspace_ERD
+' =============================================================================
+' SƠ ĐỒ THỰC THỂ LIÊN KẾT (ERD) - HỆ THỐNG AGILE WORKSPACE (17 BẢNG)
+' Cách nhập vào draw.io (diagrams.net):
+'   Arrange -> Insert -> Advanced -> PlantUML... -> Chọn định dạng SVG -> Insert
+' =============================================================================
+
+left to right direction
+hide circle
+hide empty methods
+skinparam linetype ortho
+skinparam roundcorner 8
+skinparam shadowing false
+skinparam dpi 150
+skinparam nodesep 35
+skinparam ranksep 55
+
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+
+skinparam package {
+  BackgroundColor #F8FAFC
+  BorderColor #CBD5E1
+  FontColor #1E293B
+  FontStyle bold
+}
+
+skinparam class {
+  BackgroundColor #FFFFFF
+  HeaderBackgroundColor #EEF2FF
+  BorderColor #94A3B8
+  ArrowColor #475569
+  FontColor #0F172A
+  AttributeFontSize 11.5
+}
+
+' =============================================================================
+' 1. NHÓM NGƯỜI DÙNG & XÁC THỰC (4 BẢNG)
+' =============================================================================
+package "1. Người dùng & Xác thực (Auth)" #F5F7FF {
+  entity "users" as users {
+    * **id** : BIGINT <<PK>>
+    --
+    * email : VARCHAR(255) <<UQ>>
+    * username : VARCHAR(50) <<UQ>>
+    password_hash : VARCHAR(255)
+    * full_name : VARCHAR(150)
+    avatar_url : VARCHAR(500)
+    * system_role : ENUM('admin','user')
+    * is_active : BOOLEAN
+    * token_version : INT
+    last_login_at : DATETIME
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "oauth_accounts" as oauth_accounts {
+    * **id** : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * provider : VARCHAR(50) <<UQ>>
+    * provider_user_id : VARCHAR(255) <<UQ>>
+    access_token : TEXT
+    refresh_token : TEXT
+    token_expires_at : DATETIME
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "password_reset_tokens" as password_reset_tokens {
+    * **id** : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    * token_hash : CHAR(64) <<UQ>>
+    * expires_at : DATETIME
+    used_at : DATETIME
+    * created_at : DATETIME
+  }
+
+  entity "revoked_tokens" as revoked_tokens {
+    * **id** : INT <<PK>>
+    --
+    * jti : VARCHAR(64) <<UQ>>
+    * expires_at : DATETIME
+    * revoked_at : DATETIME
+  }
+}
+
+' =============================================================================
+' 2. NHÓM DỰ ÁN, PHÂN QUYỀN & LỜI MỜI (3 BẢNG)
+' =============================================================================
+package "2. Dự án & Phân quyền RBAC" #F0FDF4 {
+  entity "projects" as projects {
+    * **id** : BIGINT <<PK>>
+    --
+    * name : VARCHAR(200)
+    description : TEXT
+    * owner_id : BIGINT <<FK>>
+    * status : ENUM('active','completed','archived')
+    start_date : DATE
+    end_date : DATE
+    * created_at : DATETIME
+    * updated_at : DATETIME
+    deleted_at : DATETIME
+  }
+
+  entity "project_members" as project_members {
+    * **project_id** : BIGINT <<PK, FK>>
+    * **user_id** : BIGINT <<PK, FK>>
+    --
+    * role : ENUM('owner','manager','member','viewer')
+    * joined_at : DATETIME
+  }
+
+  entity "project_invitations" as project_invitations {
+    * **id** : BIGINT <<PK>>
+    --
+    * project_id : BIGINT <<FK>>
+    inviter_id : BIGINT <<FK>>
+    * invitee_email : VARCHAR(255)
+    invitee_id : BIGINT <<FK>>
+    * role : ENUM('manager','member','viewer')
+    * token : CHAR(64) <<UQ>>
+    * status : ENUM('pending','accepted','declined','expired','cancelled')
+    * expires_at : DATETIME
+    * created_at : DATETIME
+    responded_at : DATETIME
+    pending_email : VARCHAR(255) <<VIRTUAL>>
+  }
+}
+
+' =============================================================================
+' 3. NHÓM BẢNG KANBAN, NHÃN & CÔNG VIỆC (5 BẢNG)
+' =============================================================================
+package "3. Bảng Kanban & Công việc" #FFFBEB {
+  entity "lists" as lists {
+    * **id** : BIGINT <<PK>>
+    --
+    * project_id : BIGINT <<FK>>
+    * name : VARCHAR(100)
+    * position : INT
+    * is_done_column : BOOLEAN
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "labels" as labels {
+    * **id** : BIGINT <<PK>>
+    --
+    * project_id : BIGINT <<FK>>
+    * name : VARCHAR(50) <<UQ>>
+    * color : CHAR(7)
+    * created_at : DATETIME
+  }
+
+  entity "tasks" as tasks {
+    * **id** : BIGINT <<PK>>
+    --
+    * project_id : BIGINT <<FK>>
+    * list_id : BIGINT <<FK>>
+    * title : VARCHAR(500)
+    description : TEXT
+    * priority : ENUM('low','medium','high','urgent')
+    * position : INT
+    start_date : DATETIME
+    due_date : DATETIME
+    completed_at : DATETIME
+    * created_by : BIGINT <<FK>>
+    * is_deleted : BOOLEAN
+    deleted_at : DATETIME
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "task_assignees" as task_assignees {
+    * **task_id** : BIGINT <<PK, FK>>
+    * **user_id** : BIGINT <<PK, FK>>
+    --
+    * assigned_at : DATETIME
+  }
+
+  entity "task_labels" as task_labels {
+    * **task_id** : BIGINT <<PK, FK>>
+    * **label_id** : BIGINT <<PK, FK>>
+  }
+}
+
+' =============================================================================
+' 4. NHÓM CỘNG TÁC, THÔNG BÁO & NHẬT KÝ HOẠT ĐỘNG (5 BẢNG)
+' =============================================================================
+package "4. Cộng tác, Thông báo & Nhật ký" #EFF6FF {
+  entity "checklist_items" as checklist_items {
+    * **id** : BIGINT <<PK>>
+    --
+    * task_id : BIGINT <<FK>>
+    * content : VARCHAR(500)
+    * is_done : BOOLEAN
+    * position : INT
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "comments" as comments {
+    * **id** : BIGINT <<PK>>
+    --
+    * task_id : BIGINT <<FK>>
+    * user_id : BIGINT <<FK>>
+    * content : TEXT
+    * created_at : DATETIME
+    * updated_at : DATETIME
+  }
+
+  entity "attachments" as attachments {
+    * **id** : BIGINT <<PK>>
+    --
+    * task_id : BIGINT <<FK>>
+    * user_id : BIGINT <<FK>>
+    * file_name : VARCHAR(255)
+    * file_path : VARCHAR(500)
+    * file_size : BIGINT
+    mime_type : VARCHAR(100)
+    * created_at : DATETIME
+  }
+
+  entity "notifications" as notifications {
+    * **id** : BIGINT <<PK>>
+    --
+    * user_id : BIGINT <<FK>>
+    project_id : BIGINT <<FK>>
+    * type : ENUM(19_event_types)
+    * title : VARCHAR(255)
+    message : TEXT
+    entity_type : VARCHAR(50)
+    entity_id : BIGINT
+    * is_read : BOOLEAN
+    * created_at : DATETIME
+  }
+
+  entity "activity_logs" as activity_logs {
+    * **id** : BIGINT <<PK>>
+    --
+    * project_id : BIGINT <<FK>>
+    task_id : BIGINT <<FK>>
+    * user_id : BIGINT <<FK>>
+    * entity_type : VARCHAR(50)
+    entity_id : BIGINT
+    * action : VARCHAR(50)
+    old_value : TEXT
+    new_value : TEXT
+    * created_at : DATETIME
+  }
+}
+
+' =============================================================================
+' QUAN HỆ KHOÁ NGOẠI (CROW'S FOOT NOTATION)
+' =============================================================================
+
+' 1. Auth
+users ||--o{ oauth_accounts : "liên kết OAuth2"
+users ||--o{ password_reset_tokens : "đặt lại mật khẩu"
+
+' 2. Projects & Members
+users ||--o{ projects : "sở hữu (owner_id)"
+projects ||--o{ project_members : "có thành viên"
+users ||--o{ project_members : "tham gia"
+projects ||--o{ project_invitations : "phát hành lời mời"
+users |o--o{ project_invitations : "gửi (inviter_id)"
+users |o--o{ project_invitations : "nhận (invitee_id)"
+
+' 3. Kanban Lists, Labels & Tasks
+projects ||--o{ lists : "chia cột trạng thái"
+projects ||--o{ labels : "định nghĩa nhãn"
+projects ||--o{ tasks : "chứa công việc"
+lists ||--o{ tasks : "phân loại cột"
+users ||--o{ tasks : "tạo (created_by)"
+
+tasks ||--o{ task_assignees : "phân công"
+users ||--o{ task_assignees : "đảm nhận"
+
+tasks ||--o{ task_labels : "gắn nhãn"
+labels ||--o{ task_labels : "áp dụng cho"
+
+' 4. Checklist, Comments, Attachments, Notifications & Activity Logs
+tasks ||--o{ checklist_items : "chia đầu việc con"
+tasks ||--o{ comments : "có bình luận"
+users ||--o{ comments : "viết bình luận"
+tasks ||--o{ attachments : "đính kèm tệp"
+users ||--o{ attachments : "tải lên"
+
+users ||--o{ notifications : "nhận thông báo"
+projects |o--o{ notifications : "phát sinh từ"
+
+projects ||--o{ activity_logs : "ghi nhật ký dự án"
+tasks |o--o{ activity_logs : "ghi nhật ký việc"
+users ||--o{ activity_logs : "thực hiện thao tác"
+
+@enduml
+
